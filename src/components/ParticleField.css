@@ -1,0 +1,25 @@
+.particle-field {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  background: radial-gradient(circle, rgba(160, 160, 160, 0.8) 0%, rgba(160, 160, 160, 0.4) 50%, transparent 100%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.particle-field.hero-particles .particle {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.6) 0%, rgba(160, 160, 160, 0.3) 50%, transparent 100%);
+}
+
+.particle-field.section-particles .particle {
+  background: radial-gradient(circle, rgba(160, 160, 160, 0.4) 0%, rgba(160, 160, 160, 0.2) 50%, transparent 100%);
+}

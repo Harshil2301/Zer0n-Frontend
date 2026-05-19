@@ -1,0 +1,154 @@
+.navigation {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--primary-bg);
+  transition: all 0.3s ease;
+}
+
+.nav-banner {
+  background: #333333;
+  padding: 0.05rem 0;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  border-top: 1px solid #333333;
+  border-bottom: 1px solid var(--border-secondary);
+  color: var(--secondary-text);
+  order: -1;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+
+
+.banner-dot {
+  color: #00ff41;
+  margin-right: 0.75rem;
+  font-size: 0.6rem;
+}
+
+.banner-arrow {
+  color: var(--primary-text);
+  margin: 0 0.75rem;
+  font-weight: 400;
+}
+
+.banner-link {
+  color: #00ff41;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.banner-link:hover {
+  color: #00cc33;
+}
+
+.nav-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.9rem 3rem;
+  max-width: none;
+  margin: 0;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.logo-image {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+
+.logo-symbol {
+  color: var(--primary-text);
+  font-size: 1.75rem;
+  font-weight: 400;
+}
+
+.logo-text {
+  color: var(--primary-text);
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+
+.nav-menu {
+  display: flex;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+.nav-item {
+  color: var(--secondary-text);
+  text-decoration: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 400;
+  transition: all 0.3s ease;
+  position: relative;
+  padding: 0.5rem 0;
+  letter-spacing: 0.02em;
+}
+
+.nav-item:hover {
+  color: var(--primary-text);
+}
+
+.nav-item:hover::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--primary-text);
+  animation: underline-expand 0.3s ease-out forwards;
+}
+
+@keyframes underline-expand {
+  from {
+    width: 0;
+    left: 50%;
+  }
+  to {
+    width: 100%;
+    left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .nav-container {
+    padding: 1rem;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .nav-menu {
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .nav-item {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-menu {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

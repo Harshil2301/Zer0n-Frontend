@@ -1,0 +1,333 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* =========================================================
+   GLOBAL CYBER BACKGROUND — used on every page
+   ========================================================= */
+
+/* The falling symbol strip overlay — rendered as a pseudo-element
+   on .cyber-page-wrapper which wraps every standalone page */
+@keyframes fall-symbol {
+  0%   { transform: translateY(-100vh); opacity: 0; }
+  5%   { opacity: 0.6; }
+  90%  { opacity: 0.4; }
+  100% { transform: translateY(110vh); opacity: 0; }
+}
+
+@keyframes grid-drift {
+  0%   { background-position: 0 0, 0 0; }
+  100% { background-position: 60px 60px, 60px 60px; }
+}
+
+/* Shared page shell — apply to every page that needs the cyber look */
+.cyber-page-wrapper {
+  position: relative;
+  min-height: 100vh;
+  background: #000000;
+  color: #ffffff;
+  overflow-x: hidden;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', monospace;
+}
+
+/* Animated grid overlay — fixed so it scrolls with page */
+.cyber-page-wrapper::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: grid-drift 30s linear infinite;
+}
+
+/* Falling cyber symbols strip */
+.cyber-symbols {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.cyber-symbols span {
+  position: absolute;
+  top: 0;
+  color: rgba(255, 255, 255, 0.12);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 1;
+  animation: fall-symbol linear infinite;
+  user-select: none;
+}
+
+/* Page content sits above the background */
+.cyber-page-content {
+  position: relative;
+  z-index: 10;
+}
+
+:root {
+  --primary-bg: #000000;
+  --secondary-bg: #0a0a0a;
+  --accent-bg: #1a1a1a;
+  --primary-text: #ffffff;
+  --secondary-text: #999999;
+  --accent-text: #666666;
+  --primary-accent: #ffffff;
+  --secondary-accent: #cccccc;
+  --highlight-color: #ffffff;
+  --gradient-primary: linear-gradient(135deg, #ffffff 0%, #cccccc 100%);
+  --gradient-secondary: linear-gradient(135deg, #333333 0%, #444444 100%);
+  --shadow-glow: 0 0 30px rgba(255, 255, 255, 0.1);
+  --shadow-subtle: 0 4px 20px rgba(0, 0, 0, 0.8);
+  --border-primary: rgba(255, 255, 255, 0.2);
+  --border-secondary: rgba(255, 255, 255, 0.05);
+  --icon-color: #ffffff;
+  --button-primary-bg: #ffffff;
+  --button-primary-text: #000000;
+  --button-primary-hover: #f0f0f0;
+  
+  font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', monospace;
+  line-height: 1.6;
+  font-weight: 400;
+  
+  color-scheme: dark;
+  color: var(--primary-text);
+  background-color: var(--primary-bg);
+  
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--primary-bg);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: filter 0.3s ease, background-color 0.3s ease;
+}
+
+body[data-theme="light"] {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Double-invert images, videos, and specific elements to keep their original colors */
+body[data-theme="light"] img:not(.logo-icon-main):not(.brand-logo-img),
+body[data-theme="light"] video,
+body[data-theme="light"] canvas,
+body[data-theme="light"] .recharts-wrapper {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+/* Enhanced scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--primary-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-text);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--primary-text);
+  letter-spacing: -0.02em;
+}
+
+.gradient-text {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.terminal-text {
+  color: var(--primary-text);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 400;
+}
+
+.code-block {
+  font-family: 'Fira Code', monospace;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-primary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.glow-effect {
+  box-shadow: var(--shadow-glow);
+}
+
+.card {
+  background: var(--secondary-bg);
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(0, 255, 65, 0.05) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.card:hover {
+  border-color: var(--border-primary);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 255, 65, 0.15);
+  transform: translateY(-4px);
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.btn-primary {
+  background: var(--button-primary-bg);
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-weight: 500;
+  color: var(--button-primary-text);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+  box-shadow: none;
+}
+
+.btn-primary:hover {
+  background: var(--button-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  padding: 11px 23px;
+  border-radius: 4px;
+  font-weight: 500;
+  color: var(--primary-text);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--primary-accent);
+  color: var(--primary-text);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.section {
+  padding: 5rem 0;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.section-title {
+  font-size: 2.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
+
+.section-subtitle {
+  font-size: 1rem;
+  color: var(--secondary-text);
+  max-width: 600px;
+  margin: 0 auto;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 1rem;
+  }
+  
+  .section {
+    padding: 3rem 0;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--primary-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-bg);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-text);
+}

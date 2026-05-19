@@ -1,0 +1,422 @@
+/* ============================================================
+   Features Section — Dark hacker aesthetic
+   ============================================================ */
+
+.features {
+  background: #000000;
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  padding: 4rem 0;
+}
+
+.section-header {
+  text-align: left;
+  margin-bottom: 2.5rem;
+}
+
+.section-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.15rem;
+  font-weight: 400;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.terminal-prefix {
+  color: #00ff41;
+  font-size: 1.3rem;
+}
+
+.title-text { color: #ffffff; }
+
+.section-subtitle {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: #666666;
+  line-height: 1.6;
+  max-width: 680px;
+}
+
+/* ── Grid ── */
+.toolkit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+/* ── Card ── */
+.toolkit-card {
+  background: #0d0d0d;
+  border: 1px solid #222222;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: default;
+}
+
+.toolkit-card.is-hovered {
+  border-color: #00ff41;
+  transform: translateY(-3px);
+  box-shadow: 0 0 24px rgba(0, 255, 65, 0.12), 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Sweep border glow on hover */
+.card-border-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  background:
+    linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.06), transparent) top / 100% 1px no-repeat,
+    linear-gradient(0deg, transparent, rgba(0, 255, 65, 0.06), transparent) right / 1px 100% no-repeat;
+}
+.toolkit-card.is-hovered .card-border-sweep { opacity: 1; }
+
+/* ── Card Header ── */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #1e1e1e;
+}
+
+.card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.card-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: #444444;
+  letter-spacing: 0.05em;
+}
+
+.card-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 0.06em;
+}
+
+.learn-more {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: #00ff41;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.learn-more:hover { color: #66ffaa; }
+
+/* ── Card Body ── */
+.card-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.content-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.card-description {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  color: #888888;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.content-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.visual-section {
+  width: 100%;
+  height: 140px;
+  position: relative;
+}
+
+/* ── Shared visual base ── */
+.feat-visual {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ============================================================
+   RADAR VISUAL
+   ============================================================ */
+.radar-svg {
+  width: 110px;
+  height: 110px;
+}
+
+.radar-ring {
+  fill: none;
+  stroke: #1a3d1a;
+  stroke-width: 1;
+}
+
+.radar-cross {
+  stroke: #1a3d1a;
+  stroke-width: 0.5;
+}
+
+.radar-sweep-line {
+  stroke: #00ff41;
+  stroke-width: 1.5;
+  transform-origin: 60px 60px;
+  animation: radarSweep 2.5s linear infinite;
+  opacity: 0.9;
+}
+
+@keyframes radarSweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.radar-blip {
+  fill: #00ff41;
+  opacity: 0;
+  animation: blipFlash 2.5s linear infinite;
+}
+.blip-1 { animation-delay: 0.1s; }
+.blip-2 { animation-delay: 0.6s; }
+.blip-3 { animation-delay: 1.2s; }
+.blip-4 { animation-delay: 1.8s; }
+
+@keyframes blipFlash {
+  0%, 30%  { opacity: 0; }
+  35%, 60% { opacity: 1; filter: drop-shadow(0 0 4px #00ff41); }
+  65%, 100%{ opacity: 0; }
+}
+
+/* ============================================================
+   BLOCKCHAIN CHAIN VISUAL
+   ============================================================ */
+.chain-svg { width: 120px; height: 60px; }
+
+.chain-block {
+  fill: #0d1a0d;
+  stroke: #00ff41;
+  stroke-width: 1;
+  animation: blockPulse 2s ease-in-out infinite alternate;
+}
+.chain-block:nth-child(3n+1) { animation-delay: 0s; }
+.chain-block:nth-child(3n+2) { animation-delay: 0.4s; }
+.chain-block:nth-child(3n+3) { animation-delay: 0.8s; }
+
+@keyframes blockPulse {
+  from { stroke: #004d14; }
+  to   { stroke: #00ff41; filter: drop-shadow(0 0 4px #00ff41); }
+}
+
+.chain-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 5px;
+  fill: #00ff41;
+}
+
+.chain-link {
+  stroke: #333333;
+  stroke-width: 1.5;
+}
+
+.chain-dot {
+  fill: #00ff41;
+  animation: dotTravel 1.2s ease-in-out infinite;
+}
+.chain-end-dot { fill: #00ff41; animation: endPulse 1.5s ease-in-out infinite; }
+
+@keyframes dotTravel {
+  0%   { opacity: 0; transform: translateX(0px); }
+  50%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(12px); }
+}
+@keyframes endPulse {
+  0%, 100% { r: 3; opacity: 0.5; }
+  50%       { r: 4; opacity: 1; filter: drop-shadow(0 0 4px #00ff41); }
+}
+
+.chain-hash-stream {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.hash-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.52rem;
+  color: #334433;
+  animation: hashFade 1.8s ease-in-out infinite alternate;
+}
+@keyframes hashFade {
+  from { color: #223322; }
+  to   { color: #00ff41; }
+}
+
+/* ============================================================
+   CONTRACT TYPEWRITER VISUAL
+   ============================================================ */
+.contract-visual {
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 6px 8px;
+  background: #080808;
+  border: 1px solid #1a1a1a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.contract-line {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.58rem;
+  white-space: nowrap;
+  opacity: 0;
+  animation: lineReveal 0.4s ease forwards;
+  display: flex;
+  gap: 0.5rem;
+}
+@keyframes lineReveal {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.contract-ln {
+  color: #333333;
+  min-width: 1.2rem;
+  user-select: none;
+}
+
+.contract-cursor {
+  color: #00ff41;
+  font-size: 0.8rem;
+  animation: cursorBlink 0.8s step-end infinite;
+}
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ============================================================
+   NETWORK VISUAL
+   ============================================================ */
+.network-svg { width: 120px; height: 105px; }
+
+.net-edge {
+  stroke: #1a2e1a;
+  stroke-width: 0.8;
+  animation: edgePulse 2s ease-in-out infinite alternate;
+}
+@keyframes edgePulse {
+  from { stroke: #111f11; }
+  to   { stroke: #00882b; }
+}
+
+.net-node {
+  fill: #0d1a0d;
+  stroke: #00ff41;
+  stroke-width: 1;
+  animation: nodePulse 2s ease-in-out infinite alternate;
+}
+@keyframes nodePulse {
+  from { stroke: #004d14; fill: #050f05; }
+  to   { stroke: #00ff41; fill: #0d2d0d; filter: drop-shadow(0 0 4px #00ff41); }
+}
+
+/* ── Code section ── */
+.code-section {
+  border-top: 1px solid #1a1a1a;
+}
+
+.code-window {
+  background: #080808;
+  border-radius: 0;
+}
+
+.code-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  background: #111111;
+  border-bottom: 1px solid #1e1e1e;
+}
+
+.window-controls {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.control {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.control.close    { background: #ff5f57; }
+.control.minimize { background: #ffbd2e; }
+.control.maximize { background: #28ca42; }
+
+.code-filename {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: #444444;
+}
+
+.code-content {
+  padding: 0.65rem 0.75rem;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.code-content pre {
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  line-height: 1.45;
+  color: #aaaaaa;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .toolkit-grid { grid-template-columns: 1fr; }
+  .card-content { grid-template-columns: 1fr; }
+  .visual-section { height: 120px; }
+}
+
+@media (max-width: 768px) {
+  .features { padding: 2.5rem 0; }
+  .card-header { flex-direction: column; align-items: flex-start; gap: 0.4rem; }
+  .visual-section { height: 110px; }
+}
+
+@media (max-width: 480px) {
+  .section-title { font-size: 1rem; }
+  .visual-section { height: 100px; }
+}

@@ -1,0 +1,319 @@
+.verification-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  z-index: 9998;
+}
+
+.verification-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) !important;
+  background: rgba(0, 0, 0, 0.98);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  border-radius: 4px;
+  padding: 15px 20px;
+  width: 90%;
+  max-width: 450px;
+  z-index: 9999;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(0, 255, 136, 0.1);
+  text-align: left;
+  overflow: hidden;
+}
+
+.verification-icon {
+  display: none;
+}
+
+.verification-icon.existing {
+  border-color: #00ccff;
+}
+
+.verification-icon.existing svg {
+  color: #00ccff;
+  filter: drop-shadow(0 0 8px rgba(0, 204, 255, 0.4));
+}
+
+.verification-icon.new {
+  border-color: #00ff88;
+}
+
+.verification-icon.new svg {
+  color: #00ff88;
+  filter: drop-shadow(0 0 8px rgba(0, 255, 136, 0.4));
+}
+
+.verification-icon.error {
+  border-color: #ff4444;
+}
+
+.verification-icon.error svg {
+  color: #ff4444;
+  filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.4));
+}
+
+@keyframes pulse-icon {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.verification-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #00ff88;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.verification-title::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  background: #00ff88;
+  border-radius: 2px;
+}
+
+.verification-popup.existing .verification-title {
+  color: #00ccff;
+}
+
+.verification-popup.existing .verification-title::before {
+  background: #00ccff;
+}
+
+.verification-popup.error .verification-title {
+  color: #ff4444;
+}
+
+.verification-popup.error .verification-title::before {
+  background: #ff4444;
+}
+
+.verification-message {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.verification-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.verification-details.single {
+  grid-template-columns: 1fr;
+}
+
+/* UUID Display */
+.uuid-display {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(0, 255, 136, 0.2);
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+}
+
+.uuid-label {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.uuid-value {
+  color: #00ff88;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  word-break: break-all;
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+}
+
+.verification-popup.existing .uuid-display {
+  border-color: rgba(0, 204, 255, 0.2);
+}
+
+.verification-popup.existing .uuid-value {
+  color: #00ccff;
+  text-shadow: 0 0 8px rgba(0, 204, 255, 0.3);
+}
+
+.similarity-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 10px;
+  background: rgba(0, 204, 255, 0.05);
+  border: 1px solid rgba(0, 204, 255, 0.25);
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.status-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.existing {
+  background: rgba(0, 204, 255, 0.08);
+  border: 1px solid rgba(0, 204, 255, 0.3);
+  color: #00ccff;
+}
+
+.status-badge.new {
+  background: rgba(0, 255, 136, 0.08);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  color: #00ff88;
+}
+
+.status-icon {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.similarity-label {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.similarity-value {
+  color: #00ccff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.status-label {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-value {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.verification-button {
+  width: 100%;
+  padding: 8px 20px;
+  background: rgba(0, 255, 136, 0.1);
+  color: #00ff88;
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.verification-button:hover {
+  background: rgba(0, 255, 136, 0.15);
+  border-color: rgba(0, 255, 136, 0.5);
+  transform: translateY(-1px);
+}
+
+.verification-button:active {
+  transform: translateY(0);
+}
+
+.verification-popup.error .verification-button {
+  background: rgba(255, 68, 68, 0.1);
+  border-color: rgba(255, 68, 68, 0.4);
+  color: #ff4444;
+}
+
+.verification-popup .error .verification-button:hover {
+  background: rgba(255, 68, 68, 0.15);
+  border-color: rgba(255, 68, 68, 0.6);
+}
+
+/* Scan Lines Effect */
+.scan-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.3;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.02) 0px,
+    transparent 1px,
+    transparent 2px,
+    rgba(255, 255, 255, 0.02) 3px
+  );
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .verification-popup {
+    padding: 15px 18px;
+    width: 90%;
+    max-width: 400px;
+  }
+
+  .verification-icon {
+    width: 45px;
+    height: 45px;
+  }
+
+  .verification-icon svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .verification-title {
+    font-size: 16px;
+  }
+
+  .verification-message {
+    font-size: 11px;
+  }
+
+  .similarity-value {
+    font-size: 13px;
+  }
+}

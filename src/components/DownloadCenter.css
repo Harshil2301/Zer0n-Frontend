@@ -1,0 +1,285 @@
+.download-page {
+  width: 100vw;
+  min-height: 100vh;
+  background: #000000;
+  color: #ffffff;
+  position: relative;
+  padding-top: 100px;
+  overflow-x: hidden;
+  display: flex;
+  justify-content: center;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.download-particles,
+.network-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  opacity: 0.3;
+}
+
+.download-container {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 800px;
+  padding: 2rem;
+  margin-bottom: 5rem;
+}
+
+.download-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.download-header .badge {
+  display: inline-block;
+  background: rgba(0, 212, 255, 0.1);
+  color: #00d4ff;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.05em;
+}
+
+.download-header h1 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 3rem;
+  margin: 0 0 1rem;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+
+.download-header .accent {
+  color: #00d4ff;
+}
+
+.download-header p {
+  color: #bbb;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Download Card */
+.download-card {
+  display: flex;
+  align-items: center;
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.download-card:hover {
+  border-color: rgba(0, 212, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.os-icon {
+  width: 80px;
+  height: 80px;
+  background: rgba(0, 212, 255, 0.1);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #00d4ff;
+  flex-shrink: 0;
+  margin-right: 2rem;
+}
+
+.card-content {
+  flex: 1;
+}
+
+.card-content h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.3rem;
+  color: #fff;
+}
+
+.file-info {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.download-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #00d4ff;
+  color: #0a0e1a;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  font-weight: bold;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  font-size: 1rem;
+}
+
+.download-btn:hover {
+  background: #fff;
+  transform: scale(1.02);
+}
+
+.download-btn.downloading {
+  background: #00ff88;
+  color: #0a0e1a;
+  pointer-events: none;
+}
+
+/* System Requirements */
+.system-requirements {
+  background: transparent;
+  padding: 0 1rem;
+  margin-bottom: 4rem;
+}
+
+.system-requirements h4 {
+  color: #888;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+}
+
+.system-requirements ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.system-requirements li {
+  color: #aaa;
+  font-size: 0.9rem;
+  position: relative;
+  padding-left: 1.2rem;
+}
+
+.system-requirements li::before {
+  content: "•";
+  color: #00d4ff;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* Installation Guide */
+.installation-guide {
+  background: rgba(10, 10, 10, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 3rem;
+}
+
+.installation-guide h2 {
+  font-family: 'JetBrains Mono', monospace;
+  margin-top: 0;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
+
+.guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.step {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.step-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.5);
+  opacity: 0.6;
+  margin-top: 0.2rem;
+}
+
+.step-content h4 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.step-content p {
+  color: #aaa;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.step-content code {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.code-snippet {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.8rem 1rem;
+  border-radius: 6px;
+  margin-top: 1rem;
+  color: #00ff88;
+}
+
+@media (max-width: 768px) {
+  .download-header h1 {
+    font-size: 2.5rem;
+  }
+  
+  .download-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 2rem 1.5rem;
+  }
+  
+  .os-icon {
+    margin: 0 0 1.5rem;
+  }
+  
+  .download-btn {
+    width: 100%;
+    justify-content: center;
+    margin-top: 1.5rem;
+  }
+  
+  .step {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .step-number {
+    font-size: 1.2rem;
+  }
+}
