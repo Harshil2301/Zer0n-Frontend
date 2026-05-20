@@ -367,7 +367,7 @@ const FaceScan = () => {
 
                 if (newCount === 2 && !messagesShownRef.current.blinkComplete) {
                   messagesShownRef.current.blinkComplete = true
-                  setMessage('Blink verification complete! Now turn your head left')
+                  setMessage('Blink verification complete! Now turn your head right')
                   addTerminalLine(`> Blink detected (${newCount}/2)`)
                   addTerminalLine('> Blink verification complete ✓')
                   addTerminalLine('> Initiating head pose verification...')
@@ -396,61 +396,44 @@ const FaceScan = () => {
           const chinDev = (chin.x - eyeMidX) / eyeSep
           const signal = noseDevX + chinDev
 
-          // Require a clear, deliberate turn — not a single frame glitch
-          const turningLeft = signal > 0.30 || noseDevX > 0.35
-          const turningRight = signal < -0.30 || noseDevX < -0.35
-          const isCentered = Math.abs(signal) < 0.08 && Math.abs(noseDevX) < 0.08
+          // Original reliable logic (reverted)
+          const turningLeft = signal < -0.12 || noseDevX < -0.15
+          const turningRight = signal > 0.12 || noseDevX > 0.15
 
           // Use a hold counter — require 4 consecutive frames to confirm (≈133ms)
           if (!headVerificationRef.current.leftHoldCount) headVerificationRef.current.leftHoldCount = 0
           if (!headVerificationRef.current.rightHoldCount) headVerificationRef.current.rightHoldCount = 0
-          if (!headVerificationRef.current.centerHoldCount) headVerificationRef.current.centerHoldCount = 0
 
-          // STEP 1: Look Left
           if (!headVerificationRef.current.left) {
             if (turningLeft) {
               headVerificationRef.current.leftHoldCount++
             } else {
               headVerificationRef.current.leftHoldCount = 0
             }
-            if (headVerificationRef.current.leftHoldCount >= 3 &&
+            if (headVerificationRef.current.leftHoldCount >= 2 &&
               !messagesShownRef.current.headLeftVerified) {
               messagesShownRef.current.headLeftVerified = true
               headVerificationRef.current.left = true
               headVerificationRef.current.leftTime = Date.now()
               headVerificationRef.current.leftHoldCount = 0
               setHeadVerification(prev => ({ ...prev, left: true }))
-              setMessage('Left verified! Now return to CENTER...')
-              addTerminalLine('> Head left verified ✓')
+              setMessage('Great! Now return to center, then turn your head left')
+              addTerminalLine('> Head Right verified ✓')
             }
           }
 
-          // STEP 2: Return to Center (Mandatory Reset)
-          const leftVerified = headVerificationRef.current.left
-          const rightVerified = headVerificationRef.current.right
-          const centerReset = headVerificationRef.current.centerReset
+          const leftAgo = headVerificationRef.current.leftTime
+            ? Date.now() - headVerificationRef.current.leftTime : 0
 
-          if (leftVerified && !rightVerified && !centerReset) {
-            if (isCentered) {
-              headVerificationRef.current.centerHoldCount++
-            } else {
-              headVerificationRef.current.centerHoldCount = 0
-            }
-            if (headVerificationRef.current.centerHoldCount >= 4) {
-              headVerificationRef.current.centerReset = true
-              setMessage('Center detected! Now turn your head RIGHT')
-              addTerminalLine('> Head centered (reset verified) ✓')
-            }
-          }
-
-          // STEP 3: Look Right (Only after center reset)
-          if (leftVerified && centerReset && !rightVerified) {
+          if (headVerificationRef.current.left &&
+            !headVerificationRef.current.right &&
+            leftAgo > 800) {  // must wait 800ms after first turn before second registers
             if (turningRight) {
               headVerificationRef.current.rightHoldCount++
             } else {
               headVerificationRef.current.rightHoldCount = 0
             }
-            if (headVerificationRef.current.rightHoldCount >= 3 &&
+            if (headVerificationRef.current.rightHoldCount >= 2 &&
               !messagesShownRef.current.headRightVerified) {
               messagesShownRef.current.headRightVerified = true
               headVerificationRef.current.right = true
@@ -458,8 +441,8 @@ const FaceScan = () => {
               setHeadVerification(prev => ({ ...prev, right: true }))
               setMessage('Verification complete! Checking database...')
               setVerificationComplete(true)
-              addTerminalLine('> Head right verified ✓')
-              addTerminalLine('> Liveness verification: 100% SUCCESS')
+              addTerminalLine('> Head Left verified ✓')
+              addTerminalLine('> Biometric scan complete')
               handleVerificationComplete()
             }
           }
