@@ -5,7 +5,6 @@ import { db } from '../../config/firebase'
 import io from 'socket.io-client'
 import { useLanguage } from '../../contexts/LanguageContext'
 import { jsPDF } from 'jspdf'
-import 'jspdf-autotable'
 
 const NewScan = ({ userId, onNavigate }) => {
   const { t } = useLanguage()
