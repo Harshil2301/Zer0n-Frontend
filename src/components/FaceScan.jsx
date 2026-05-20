@@ -398,8 +398,8 @@ const FaceScan = () => {
 
           // Require a clear, deliberate turn — not a single frame glitch
           // Threshold lowered to 0.10 so a moderate turn registers easily
-          const turningLeft = signal > 0.10 || noseDevX > 0.12
-          const turningRight = signal < -0.10 || noseDevX < -0.12
+          const turningLeft = signal > 0.20 || noseDevX > 0.22
+          const turningRight = signal < -0.20 || noseDevX < -0.22
 
           // Use a hold counter — require 4 consecutive frames to confirm (≈133ms)
           if (!headVerificationRef.current.leftHoldCount) headVerificationRef.current.leftHoldCount = 0
