@@ -268,15 +268,25 @@ const FaceScan = () => {
     import('@mediapipe/face_mesh').then(({ FaceMesh }) => {
       if (!loopActiveRef.current) return
 
-      const faceMesh = new FaceMesh({
-        locateFile: (file) =>
-          `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${file}`,
-      })
+      // Safely initialize FaceMesh
+      let faceMesh;
+      try {
+        if (typeof window.FaceMesh !== 'function') {
+           throw new Error('FaceMesh constructor not found');
+        }
+        faceMesh = new window.FaceMesh({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+        })
+      } catch (err) {
+        console.warn('MediaPipe FaceMesh failed to construct, falling back...', err);
+        triggerFallback();
+        return;
+      }
 
       faceMesh.setOptions({
         maxNumFaces: 1,
         refineLandmarks: true,        // KEY FIX: enables attention mesh (V2) for accurate eyelids
-        minDetectionConfidence: 0.65, // higher for daytime glare robustness
+        minDetectionConfidence: 0.5, // higher for daytime glare robustness
         minTrackingConfidence: 0.5,
       })
 
