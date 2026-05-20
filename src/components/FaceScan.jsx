@@ -397,44 +397,60 @@ const FaceScan = () => {
           const signal = noseDevX + chinDev
 
           // Require a clear, deliberate turn — not a single frame glitch
-          // Threshold lowered to 0.10 so a moderate turn registers easily
-          const turningLeft = signal > 0.20 || noseDevX > 0.22
-          const turningRight = signal < -0.20 || noseDevX < -0.22
+          const turningLeft = signal > 0.30 || noseDevX > 0.35
+          const turningRight = signal < -0.30 || noseDevX < -0.35
+          const isCentered = Math.abs(signal) < 0.08 && Math.abs(noseDevX) < 0.08
 
           // Use a hold counter — require 4 consecutive frames to confirm (≈133ms)
           if (!headVerificationRef.current.leftHoldCount) headVerificationRef.current.leftHoldCount = 0
           if (!headVerificationRef.current.rightHoldCount) headVerificationRef.current.rightHoldCount = 0
+          if (!headVerificationRef.current.centerHoldCount) headVerificationRef.current.centerHoldCount = 0
 
+          // STEP 1: Look Left
           if (!headVerificationRef.current.left) {
             if (turningLeft) {
               headVerificationRef.current.leftHoldCount++
             } else {
               headVerificationRef.current.leftHoldCount = 0
             }
-            if (headVerificationRef.current.leftHoldCount >= 2 &&
+            if (headVerificationRef.current.leftHoldCount >= 3 &&
               !messagesShownRef.current.headLeftVerified) {
               messagesShownRef.current.headLeftVerified = true
               headVerificationRef.current.left = true
               headVerificationRef.current.leftTime = Date.now()
               headVerificationRef.current.leftHoldCount = 0
               setHeadVerification(prev => ({ ...prev, left: true }))
-              setMessage('Great! Now return to center, then turn your head right')
+              setMessage('Left verified! Now return to CENTER...')
               addTerminalLine('> Head left verified ✓')
             }
           }
 
-          const leftAgo = headVerificationRef.current.leftTime
-            ? Date.now() - headVerificationRef.current.leftTime : 0
+          // STEP 2: Return to Center (Mandatory Reset)
+          const leftVerified = headVerificationRef.current.left
+          const rightVerified = headVerificationRef.current.right
+          const centerReset = headVerificationRef.current.centerReset
 
-          if (headVerificationRef.current.left &&
-            !headVerificationRef.current.right &&
-            leftAgo > 800) {  // must wait 800ms after left before right registers
+          if (leftVerified && !rightVerified && !centerReset) {
+            if (isCentered) {
+              headVerificationRef.current.centerHoldCount++
+            } else {
+              headVerificationRef.current.centerHoldCount = 0
+            }
+            if (headVerificationRef.current.centerHoldCount >= 4) {
+              headVerificationRef.current.centerReset = true
+              setMessage('Center detected! Now turn your head RIGHT')
+              addTerminalLine('> Head centered (reset verified) ✓')
+            }
+          }
+
+          // STEP 3: Look Right (Only after center reset)
+          if (leftVerified && centerReset && !rightVerified) {
             if (turningRight) {
               headVerificationRef.current.rightHoldCount++
             } else {
               headVerificationRef.current.rightHoldCount = 0
             }
-            if (headVerificationRef.current.rightHoldCount >= 2 &&
+            if (headVerificationRef.current.rightHoldCount >= 3 &&
               !messagesShownRef.current.headRightVerified) {
               messagesShownRef.current.headRightVerified = true
               headVerificationRef.current.right = true
@@ -443,7 +459,7 @@ const FaceScan = () => {
               setMessage('Verification complete! Checking database...')
               setVerificationComplete(true)
               addTerminalLine('> Head right verified ✓')
-              addTerminalLine('> Generating face descriptor...')
+              addTerminalLine('> Liveness verification: 100% SUCCESS')
               handleVerificationComplete()
             }
           }
