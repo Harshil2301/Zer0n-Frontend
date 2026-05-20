@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { BarChart3, Shield, Send, Globe, AlertCircle, Terminal, Activity, Settings } from 'lucide-react'
+import { BarChart3, Shield, Send, Globe, AlertCircle, Terminal, Activity, Settings, Download, ExternalLink } from 'lucide-react'
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, collection } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import io from 'socket.io-client'
 import { useLanguage } from '../../contexts/LanguageContext'
+import { jsPDF } from 'jspdf'
+import 'jspdf-autotable'
 
 const NewScan = ({ userId, onNavigate }) => {
   const { t } = useLanguage()
@@ -224,6 +226,116 @@ const NewScan = ({ userId, onNavigate }) => {
     }
   }
 
+  // --- PDF GENERATION LOGIC (MATCHED TO SCAN HISTORY) ---
+  const handleDownloadReport = async (scanId) => {
+    const newWindow = window.open('', '_blank')
+    if (newWindow) {
+      newWindow.document.write(`<html><body style="background:#000;color:#00ff88;display:flex;align-items:center;justify-content:center;height:100vh;font-family:monospace;">GENERATING SECURE REPORT...</body></html>`)
+    }
+
+    try {
+      const scanDocRef = doc(db, 'scans', scanId)
+      const scanDoc = await getDoc(scanDocRef)
+      if (scanDoc.exists()) {
+        const scanData = scanDoc.data()
+        const vulnCandidates = scanData.vulnerabilities || scanData.vulns || []
+        const vulnerabilities = Array.isArray(vulnCandidates) ? vulnCandidates : []
+        
+        // Use the same professional layout as ScanHistory but even more premium
+        newWindow.document.open()
+        newWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>ZerOn Security Audit - ${scanId}</title>
+              <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                body { background: #08080c !important; color: #d1d4dc; font-family: 'Segoe UI', sans-serif; padding: 40px; margin: 0; }
+                .container { max-width: 900px; margin: 0 auto; }
+                
+                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #00ff88; padding-bottom: 20px; margin-bottom: 40px; }
+                .brand { font-size: 28px; font-weight: 850; color: #00ff88; letter-spacing: 2px; }
+                .brand span { color: #00d4ff; }
+                .confidential { background: rgba(255, 45, 85, 0.1); color: #ff2d55; border: 1px solid #ff2d55; padding: 5px 15px; border-radius: 4px; font-size: 12px; font-weight: bold; letter-spacing: 1px; }
+                
+                .summary-card { background: #111218; border: 1px solid #222530; border-radius: 12px; padding: 30px; margin-bottom: 40px; }
+                .summary-title { color: #00d4ff; font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 20px; border-bottom: 1px solid #222530; padding-bottom: 10px; }
+                .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+                .summary-item { font-size: 13px; }
+                .summary-item strong { color: #8a8d9a; display: inline-block; width: 150px; font-size: 11px; text-transform: uppercase; }
+                
+                .vuln-card { background: #111218; border: 1px solid #222530; border-left: 6px solid #ff2d55; border-radius: 10px; padding: 25px; margin-bottom: 30px; break-inside: avoid; }
+                .vuln-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #222530; padding-bottom: 12px; }
+                .vuln-title { font-size: 18px; color: #fff; font-weight: 700; }
+                .severity-tag { padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+                
+                pre { background: #08080c; border: 1px solid #1f222e; padding: 15px; border-radius: 6px; color: #00d4ff; font-family: 'Consolas', monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow: auto; margin-top: 10px; }
+                .section-label { color: #8a8d9a; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 15px; display: block; }
+                
+                .footer { text-align: center; border-top: 1px solid #222530; padding-top: 20px; margin-top: 60px; font-size: 11px; color: #555; font-family: monospace; letter-spacing: 1px; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <div class="brand">ZER<span>ON</span> SECURITY AUDIT</div>
+                  <div class="confidential">TOP SECRET • INTERNAL USE ONLY</div>
+                </div>
+                
+                <div class="summary-card">
+                  <div class="summary-title">Executive VAPT Summary</div>
+                  <div class="summary-grid">
+                    <div class="summary-item"><strong>Target Domain:</strong> ${scanData.domain}</div>
+                    <div class="summary-item"><strong>Assessment Date:</strong> ${new Date(scanData.createdAt).toLocaleDateString()}</div>
+                    <div class="summary-item"><strong>Scan Status:</strong> COMPLETED</div>
+                    <div class="summary-item"><strong>Identified Risks:</strong> ${vulnerabilities.length} Points of Exposure</div>
+                  </div>
+                </div>
+
+                <h2 style="font-size: 20px; color: #00d4ff; margin-bottom: 25px; letter-spacing: 1px;">VULNERABILITY ASSESSMENT FINDINGS</h2>
+                
+                ${vulnerabilities.map(v => {
+                  const isHigh = v.severity?.toLowerCase() === 'critical' || v.severity?.toLowerCase() === 'high';
+                  return `
+                    <div class="vuln-card" style="border-left-color: ${isHigh ? '#ff2d55' : '#ffd60a'}">
+                      <div class="vuln-header">
+                        <div class="vuln-title">${v.type || 'Security Violation'}</div>
+                        <div class="severity-tag" style="background: ${isHigh ? 'rgba(255,45,85,0.1)' : 'rgba(255,214,10,0.1)'}; color: ${isHigh ? '#ff2d55' : '#ffd60a'}">
+                          ${v.severity || 'UNKNOWN'}
+                        </div>
+                      </div>
+                      <div style="font-size: 13px; margin-bottom: 5px;"><strong>Endpoint:</strong> <code>${v.endpoint || scanData.domain}</code></div>
+                      <div style="font-size: 13px;"><strong>Parameter:</strong> <code>${v.parameter || 'N/A'}</code></div>
+                      
+                      <span class="section-label">Technical Proof of Concept (PoC)</span>
+                      <pre>${v.proof || v.description || 'Verified via automated security engine.'}</pre>
+                      
+                      <span class="section-label">Remediation Suggestion</span>
+                      <div style="margin-top: 8px; font-size: 13px; line-height: 1.4;">
+                        ${v.type?.includes('SQL') ? 'Implement parameterized queries and use Web Application Firewalls (WAF) to filter malicious patterns.' : 
+                          v.type?.includes('XSS') ? 'Enforce strict Content Security Policy (CSP) headers and escape all dynamic content output.' : 
+                          'Audit your security headers and ensure the application follows OWASP Top 10 best practices.'}
+                      </div>
+                    </div>
+                  `
+                }).join('')}
+                
+                <div class="footer">
+                  [ PRODUCED BY ZERON AUTONOMOUS AGENT • CERTIFICATE ID: ${scanId.substring(0,8)} ]
+                </div>
+              </div>
+              <script>window.onload = () => { setTimeout(() => window.print(), 800); }</script>
+            </body>
+          </html>
+        `)
+        newWindow.document.close()
+      }
+    } catch (err) {
+      newWindow.close()
+      alert('Report generation failed.')
+    }
+  }
+
   return (
     <div className="new-scan-container-dash">
       <div className="section-header-dash">
@@ -358,20 +470,21 @@ const NewScan = ({ userId, onNavigate }) => {
 
           {/* Completion Summary */}
           {scanCompleted && scanSummary && (
-            <div style={{ background: '#0a1a0a', border: '1px solid #00ff8844', borderRadius: '6px', padding: '16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ color: '#00ff88', fontWeight: 'bold', fontSize: '16px' }}>
+            <div style={{ background: '#0a1a0a', border: '1px solid #00ff8844', borderRadius: '6px', padding: '16px', marginBottom: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: '#00ff88', fontBold: 'bold', fontSize: '16px' }}>
                   {scanSummary.totalVulnerabilities ?? 0} Vulnerabilities Found
                 </div>
-                <div style={{ color: '#888', fontSize: '13px', marginTop: '4px' }}>
+                <div style={{ color: '#888', fontSize: '12px', marginTop: '4px' }}>
                   Scan ID: {activeScanId?.substring(0, 16)}...
                 </div>
               </div>
+              
               <button
-                onClick={() => window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/scan/${activeScanId}/report.pdf`, '_blank')}
-                style={{ background: '#00ff88', color: '#000', border: 'none', borderRadius: '6px', padding: '10px 20px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}
+                onClick={() => handleDownloadReport(activeScanId)}
+                style={{ background: '#00ff88', color: '#000', border: 'none', borderRadius: '6px', padding: '10px 15px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                ⬇ Download PDF Report
+                <Download size={14} /> PDF
               </button>
             </div>
           )}

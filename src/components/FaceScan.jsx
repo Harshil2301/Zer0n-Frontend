@@ -3,9 +3,9 @@ import { motion } from 'framer-motion'
 import { Camera, Terminal, Shield, Lock, Wifi, Activity, ArrowLeft } from 'lucide-react'
 import * as faceapi from 'face-api.js'
 
-import { 
-  generateFaceVector, 
-  checkExistingFaceVector 
+import {
+  generateFaceVector,
+  checkExistingFaceVector
 } from '../utils/faceVerification'
 import VerificationPopup from './VerificationPopup'
 import './FaceScan.css'
@@ -39,7 +39,7 @@ const FaceScan = () => {
   const [scanningProgress, setScanningProgress] = useState(0)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
-  
+
   // Face verification states
   const [modelsLoaded, setModelsLoaded] = useState(false)
   const [blinkCount, setBlinkCount] = useState(0)
@@ -60,7 +60,7 @@ const FaceScan = () => {
   const loopActiveRef = useRef(false)  // controls the detection loop lifecycle
   const blinkCooldown = 500
   const detectionIntervalRef = useRef(null)
-  
+
   // Track messages to avoid duplicates
   const messagesShownRef = useRef({
     blinkComplete: false,
@@ -68,7 +68,7 @@ const FaceScan = () => {
     headLeftVerified: false,
     headRightVerified: false
   })
-  
+
   // Popup state
   const [showPopup, setShowPopup] = useState(false)
   const [popupResult, setPopupResult] = useState(null)
@@ -179,7 +179,7 @@ const FaceScan = () => {
         setHasError(true)
         addTerminalLine('> ERROR: Failed to load face detection models')
         addTerminalLine('> System will reset in 3 seconds...')
-        
+
         // Auto-reset after 3 seconds
         setTimeout(() => {
           window.location.reload()
@@ -200,12 +200,12 @@ const FaceScan = () => {
   useEffect(() => {
     const startCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
             width: { ideal: 720 },
             height: { ideal: 560 },
-            facingMode: 'user' 
-          } 
+            facingMode: 'user'
+          }
         })
         if (videoRef.current) {
           videoRef.current.srcObject = stream
@@ -218,7 +218,7 @@ const FaceScan = () => {
         addTerminalLine('> ERROR: Camera access denied')
         addTerminalLine('> Please allow camera permissions')
         addTerminalLine('> System will reset in 3 seconds...')
-        
+
         // Auto-reset after 3 seconds
         setTimeout(() => {
           window.location.reload()
@@ -272,7 +272,7 @@ const FaceScan = () => {
       let faceMesh;
       try {
         if (typeof window.FaceMesh !== 'function') {
-           throw new Error('FaceMesh constructor not found');
+          throw new Error('FaceMesh constructor not found');
         }
         faceMesh = new window.FaceMesh({
           locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
@@ -305,7 +305,7 @@ const FaceScan = () => {
           }
           return
         }
-        
+
         noFaceFrames = 0
         const lms = results.multiFaceLandmarks[0]
 
@@ -323,9 +323,9 @@ const FaceScan = () => {
 
         // ── EAR ───────────────────────────────────────────────────────────
         // CORRECT landmark indices for browser MediaPipe FaceMesh (V2)
-        const leftEAR  = ear6(px(lms,362), px(lms,380), px(lms,374), px(lms,263), px(lms,386), px(lms,385))
-        const rightEAR = ear6(px(lms,33),  px(lms,159), px(lms,158), px(lms,133), px(lms,153), px(lms,145))
-        const avgEAR   = (leftEAR + rightEAR) / 2
+        const leftEAR = ear6(px(lms, 362), px(lms, 380), px(lms, 374), px(lms, 263), px(lms, 386), px(lms, 385))
+        const rightEAR = ear6(px(lms, 33), px(lms, 159), px(lms, 158), px(lms, 133), px(lms, 153), px(lms, 145))
+        const avgEAR = (leftEAR + rightEAR) / 2
         setCurrentEAR(parseFloat(avgEAR.toFixed(3)))
 
         // ── DYNAMIC EAR BASELINE ──────────────────────────────────────────
@@ -334,7 +334,7 @@ const FaceScan = () => {
         if (baselineSamplesRef.current < 60) {
           baselineEARRef.current += avgEAR
           baselineSamplesRef.current++
-          
+
           const remaining = 60 - baselineSamplesRef.current
           setMessage(`Calibrating eye sensors... (${remaining} frames)`)
           return // Wait for full baseline before detecting blinks
@@ -353,7 +353,7 @@ const FaceScan = () => {
           } else {
             // Eyes just opened — check if counter is in valid blink range
             const closedCount = closedFramesRef.current
-            
+
             // Minimum frames below threshold = confirmed blink
             // More than 15 frames = eyes closed / sleeping, not a blink
             if (closedCount >= 2 && closedCount <= 15) {
@@ -385,21 +385,21 @@ const FaceScan = () => {
         // ── HEAD POSE via nose deviation ──────────────────────────────────
         if (blinkCountRef.current >= 2 && !verificationComplete) {
           const noseTip = px(lms, 4)   // MediaPipe landmark 4 = nose tip (most stable)
-          const chin    = px(lms, 152) // chin centre
+          const chin = px(lms, 152) // chin centre
 
-          const leye = { x: (px(lms,33).x  + px(lms,133).x)  / 2, y: (px(lms,33).y  + px(lms,133).y)  / 2 }
-          const reye = { x: (px(lms,362).x + px(lms,263).x) / 2, y: (px(lms,362).y + px(lms,263).y) / 2 }
+          const leye = { x: (px(lms, 33).x + px(lms, 133).x) / 2, y: (px(lms, 33).y + px(lms, 133).y) / 2 }
+          const reye = { x: (px(lms, 362).x + px(lms, 263).x) / 2, y: (px(lms, 362).y + px(lms, 263).y) / 2 }
           const eyeMidX = (leye.x + reye.x) / 2
-          const eyeSep  = Math.abs(reye.x - leye.x) + 1
+          const eyeSep = Math.abs(reye.x - leye.x) + 1
 
           const noseDevX = (noseTip.x - eyeMidX) / eyeSep
-          const chinDev  = (chin.x    - eyeMidX) / eyeSep
-          const signal   = noseDevX + chinDev
+          const chinDev = (chin.x - eyeMidX) / eyeSep
+          const signal = noseDevX + chinDev
 
           // Require a clear, deliberate turn — not a single frame glitch
           // Threshold lowered to 0.10 so a moderate turn registers easily
-          const turningLeft  = signal < -0.10 || noseDevX < -0.12
-          const turningRight = signal > 0.10  || noseDevX >  0.12
+          const turningLeft = signal > 0.10 || noseDevX > 0.12
+          const turningRight = signal < -0.10 || noseDevX < -0.12
 
           // Use a hold counter — require 4 consecutive frames to confirm (≈133ms)
           if (!headVerificationRef.current.leftHoldCount) headVerificationRef.current.leftHoldCount = 0
@@ -412,7 +412,7 @@ const FaceScan = () => {
               headVerificationRef.current.leftHoldCount = 0
             }
             if (headVerificationRef.current.leftHoldCount >= 2 &&
-                !messagesShownRef.current.headLeftVerified) {
+              !messagesShownRef.current.headLeftVerified) {
               messagesShownRef.current.headLeftVerified = true
               headVerificationRef.current.left = true
               headVerificationRef.current.leftTime = Date.now()
@@ -427,15 +427,15 @@ const FaceScan = () => {
             ? Date.now() - headVerificationRef.current.leftTime : 0
 
           if (headVerificationRef.current.left &&
-              !headVerificationRef.current.right &&
-              leftAgo > 800) {  // must wait 800ms after left before right registers
+            !headVerificationRef.current.right &&
+            leftAgo > 800) {  // must wait 800ms after left before right registers
             if (turningRight) {
               headVerificationRef.current.rightHoldCount++
             } else {
               headVerificationRef.current.rightHoldCount = 0
             }
             if (headVerificationRef.current.rightHoldCount >= 2 &&
-                !messagesShownRef.current.headRightVerified) {
+              !messagesShownRef.current.headRightVerified) {
               messagesShownRef.current.headRightVerified = true
               headVerificationRef.current.right = true
               headVerificationRef.current.rightHoldCount = 0
@@ -464,7 +464,7 @@ const FaceScan = () => {
         const sendFrame = async () => {
           if (!loopActiveRef.current) return
           if (video.readyState >= 2 && mpReady) {
-            try { await faceMesh.send({ image: video }) } catch (_) {}
+            try { await faceMesh.send({ image: video }) } catch (_) { }
           }
           rafId = requestAnimationFrame(sendFrame)
         }
@@ -516,9 +516,9 @@ const FaceScan = () => {
     const y1 = point1.y !== undefined ? point1.y : point1._y
     const x2 = point2.x !== undefined ? point2.x : point2._x
     const y2 = point2.y !== undefined ? point2.y : point2._y
-    
+
     return Math.sqrt(
-      Math.pow(x2 - x1, 2) + 
+      Math.pow(x2 - x1, 2) +
       Math.pow(y2 - y1, 2)
     )
   }
@@ -526,12 +526,12 @@ const FaceScan = () => {
   // Calculate overall progress — reads from REFS not stale state
   const calculateProgress = (blinksOverride, leftOverride, rightOverride) => {
     const blinks = blinksOverride ?? blinkCountRef.current
-    const left   = leftOverride  ?? headVerificationRef.current.left
-    const right  = rightOverride ?? headVerificationRef.current.right
-    if (right && left)      return 100
-    if (left && !right)    return 75
-    if (blinks >= 2)       return 50
-    if (blinks === 1)      return 25
+    const left = leftOverride ?? headVerificationRef.current.left
+    const right = rightOverride ?? headVerificationRef.current.right
+    if (right && left) return 100
+    if (left && !right) return 75
+    if (blinks >= 2) return 50
+    if (blinks === 1) return 25
     return 0
   }
 
@@ -571,7 +571,7 @@ const FaceScan = () => {
             .detectSingleFace(videoRef.current, ssdOptions)
             .withFaceLandmarks()
             .withFaceDescriptor()
-            
+
           if (retry) {
             const quality = checkFaceQuality(retry)
             if (!quality.ok) {
@@ -631,13 +631,13 @@ const FaceScan = () => {
           addTerminalLine('> ⚠ UNCERTAIN MATCH: Confidence too low.')
           addTerminalLine('> MFA Required. Redirecting to Email/Password login...')
           setSpoofAlert(false)
-          
+
           setPopupResult({
             type: 'warning',
             message: 'Biometric match uncertain. Please use Email/Password fallback to verify your identity.'
           })
           setShowPopup(true)
-          
+
           setTimeout(() => {
             window.location.href = '/identity'
           }, 3500)
@@ -668,11 +668,11 @@ const FaceScan = () => {
 
         // ✅ STEP 2: Check if user has complete profile data in Firebase
         let isComplete = false
-        
+
         try {
           // Check Firebase first
           const userResult = await getUserProfile(existingFace.uuid)
-          
+
           if (userResult.success && userResult.user) {
             // Check if all required fields are present
             isComplete = userResult.user.profile &&
@@ -680,7 +680,7 @@ const FaceScan = () => {
               userResult.user.profile.email &&
               userResult.user.profile.organization &&
               (userResult.user.profile.role || userResult.user.profile.phone) // At least one more field
-            
+
             if (isComplete) {
               addTerminalLine('> ✓ Profile complete in Firebase!')
             } else {
@@ -692,18 +692,18 @@ const FaceScan = () => {
         } catch (fbError) {
           console.log('Firebase check failed, trying API:', fbError)
           addTerminalLine('> Firebase unavailable, checking via API...')
-          
+
           // Fallback to API check
           try {
             const response = await fetch(`/api/user/${existingFace.uuid}/check-complete`)
             const data = await response.json()
-            
-            isComplete = data.user && 
+
+            isComplete = data.user &&
               data.user.profile &&
               data.user.profile.fullName &&
               data.user.profile.email &&
               data.user.profile.organization
-              
+
           } catch (apiError) {
             console.log('API also not available')
             addTerminalLine('> API also not available')
@@ -714,16 +714,16 @@ const FaceScan = () => {
           // ✅ COMPLETE DATA - Create NEW session and redirect to dashboard
           addTerminalLine('> ✓ All required fields present!')
           addTerminalLine('> Creating new session for this user...')
-          
+
           // Store NEW session in localStorage with unique session ID
           const newSessionId = 'session-' + existingFace.uuid + '-' + Date.now()
           localStorage.setItem('userId', existingFace.uuid)
           localStorage.setItem('sessionId', newSessionId)
           localStorage.setItem('sessionTimestamp', Date.now().toString())
-          
+
           addTerminalLine(`> ✓ New session created: ${newSessionId.substring(0, 20)}...`)
           addTerminalLine('> Redirecting to dashboard...')
-          
+
           setTimeout(() => {
             redirectWithUUID('/dashboard', existingFace.uuid)
           }, 1000)
@@ -731,38 +731,38 @@ const FaceScan = () => {
           // ✅ INCOMPLETE DATA - Create NEW session and redirect to identity page
           addTerminalLine('> Missing required fields')
           addTerminalLine('> Creating new session...')
-          
+
           const newSessionId = 'session-' + existingFace.uuid + '-' + Date.now()
           localStorage.setItem('userId', existingFace.uuid)
           localStorage.setItem('sessionId', newSessionId)
           localStorage.setItem('sessionTimestamp', Date.now().toString())
-          
+
           addTerminalLine('> ✓ New session created')
           addTerminalLine('> Redirecting to identity page to complete profile...')
-          
+
           setTimeout(() => {
             redirectWithUUID('/identity', existingFace.uuid)
           }, 1000)
         }
-        
+
       } else {
         // ✅ NEW USER - Face NOT found in Firebase
         addTerminalLine('> No matching face in database')
         addTerminalLine('> Status: NEW USER DETECTED')
         addTerminalLine('> Clearing any previous session data...')
-        
+
         // ✅ CLEAR OLD SESSION FIRST (Important for new user)
         localStorage.removeItem('userId')
         localStorage.removeItem('sessionId')
         localStorage.removeItem('sessionTimestamp')
-        
+
         addTerminalLine('> Generating secure UUID for new user...')
-        
+
         // Import utilities
         const { generateUserId, redirectWithUUID } = await import('../utils/uuid')
         const { storeUserProfile } = await import('../utils/faceVerification')
         const newUserId = generateUserId()
-        
+
         addTerminalLine(`> UUID generated: ${newUserId}`)
         addTerminalLine('> Storing AES-encrypted vector via secure backend API...')
 
@@ -775,12 +775,12 @@ const FaceScan = () => {
         })
         const enrollData = await enrollResp.json()
         const storeResult = { success: enrollResp.ok, uuid: enrollData.uuid || newUserId }
-        
+
         if (storeResult.success) {
           addTerminalLine('> ✓ Face vector stored in Firebase!')
           addTerminalLine(`> ✓ UUID: ${storeResult.uuid}`)
           addTerminalLine('> Creating user profile document...')
-          
+
           // ✅ STEP 4: Create basic user profile in Firebase for NEW user
           try {
             const profileResult = await storeUserProfile(newUserId, {
@@ -800,7 +800,7 @@ const FaceScan = () => {
                 credits: 10
               }
             })
-            
+
             if (profileResult.success) {
               addTerminalLine('> ✓ User profile created in Firebase')
             } else {
@@ -810,36 +810,36 @@ const FaceScan = () => {
             console.log('Firebase user profile creation failed:', fbError)
             addTerminalLine('> ⚠ User profile creation failed - will create on identity page')
           }
-          
+
           // ✅ Create NEW session for NEW user
           addTerminalLine('> Creating new session for new user...')
           const newSessionId = 'session-' + newUserId + '-' + Date.now()
           localStorage.setItem('userId', newUserId)
           localStorage.setItem('sessionId', newSessionId)
           localStorage.setItem('sessionTimestamp', Date.now().toString())
-          
+
           addTerminalLine(`> ✓ New session created: ${newSessionId.substring(0, 20)}...`)
           addTerminalLine('> Redirecting to identity page to complete profile...')
-          
+
           setTimeout(() => {
             redirectWithUUID('/identity', newUserId)
           }, 1500)
         } else {
           addTerminalLine('> ⚠ Firebase unavailable')
           addTerminalLine('> Proceeding with UUID anyway...')
-          
+
           // Still create session even if Firebase fails
           const newSessionId = 'session-' + newUserId + '-' + Date.now()
           localStorage.setItem('userId', newUserId)
           localStorage.setItem('sessionId', newSessionId)
           localStorage.setItem('sessionTimestamp', Date.now().toString())
-          
+
           setTimeout(() => {
             redirectWithUUID('/identity', newUserId)
           }, 1500)
         }
       }
-      
+
     } catch (error) {
       console.error('Verification error:', error)
       addTerminalLine(`> ERROR: ${error.message}`)
@@ -875,11 +875,11 @@ const FaceScan = () => {
     const typeInterval = setInterval(() => {
       if (currentLineIndex < Math.min(5, hackingCode.length)) {
         const fullLine = hackingCode[currentLineIndex]
-        
+
         if (currentCharIndex < fullLine.length) {
           currentLine += fullLine[currentCharIndex]
           currentCharIndex++
-          
+
           setTerminalLines(prev => {
             const newLines = [...prev]
             newLines[currentLineIndex] = currentLine
@@ -900,7 +900,7 @@ const FaceScan = () => {
 
   return (
     <div className="face-scan-container">
-      <motion.div 
+      <motion.div
         className="face-scan-box"
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -908,7 +908,7 @@ const FaceScan = () => {
       >
         <div className="scan-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <button 
+            <button
               onClick={() => window.location.href = '/'}
               style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '0 0 12px 0', transition: 'color 0.2s' }}
               onMouseEnter={(e) => e.currentTarget.style.color = '#fff'}
@@ -935,16 +935,16 @@ const FaceScan = () => {
           {/* Left: Camera Screen */}
           <div className="camera-section">
             <div className="camera-container">
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
                 muted
                 className="camera-feed"
                 width="720"
                 height="560"
               />
-              <canvas 
+              <canvas
                 ref={canvasRef}
                 className="camera-canvas"
                 width="720"
@@ -982,7 +982,7 @@ const FaceScan = () => {
                 <span className="ear-value">{currentEAR.toFixed(3)}</span>
               </div>
               <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 100 }}>
-                <button 
+                <button
                   onClick={() => {
                     localStorage.setItem('bypassLoginTime', new Date().toISOString())
                     window.location.href = '/dashboard?id=dev-bypass'
@@ -993,7 +993,7 @@ const FaceScan = () => {
                 </button>
               </div>
             </div>
-            
+
             {/* Progress Bar */}
             <div className="scan-progress">
               <div className="progress-label">
@@ -1001,7 +1001,7 @@ const FaceScan = () => {
                 <span className="progress-percent">{scanningProgress}%</span>
               </div>
               <div className="progress-bar-container">
-                <motion.div 
+                <motion.div
                   className="progress-bar-fill"
                   initial={{ width: '0%' }}
                   animate={{ width: `${scanningProgress}%` }}
@@ -1032,11 +1032,11 @@ const FaceScan = () => {
                   )}
                 </div>
               ))}
-              
+
               {/* 2FA Fallback Button - Appears if scan takes a while or fails */}
               {terminalLines.length > 5 && !verificationComplete && !showPopup && (
                 <div className="terminal-line" style={{ marginTop: '1rem' }}>
-                  <button 
+                  <button
                     onClick={() => window.location.href = '/identity'}
                     style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
@@ -1085,7 +1085,7 @@ const FaceScan = () => {
       </motion.div>
 
       {/* Verification Popup */}
-      <VerificationPopup 
+      <VerificationPopup
         isOpen={showPopup}
         onClose={() => setShowPopup(false)}
         result={popupResult}
