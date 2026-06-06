@@ -48,9 +48,36 @@ const ScanHistory = ({ userId }) => {
 
     fetchScanHistory()
     
-    // Refresh scan status every 30 seconds
-    const interval = setInterval(fetchScanHistory, 30000)
-    return () => clearInterval(interval)
+    let isMounted = true;
+    let socketInstance = null;
+
+    // Setup Socket.IO for real-time updates
+    const initSocket = async () => {
+      try {
+        const { io } = await import('socket.io-client')
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+        const socket = io(apiUrl)
+        
+        socket.on('scan_complete', () => { if (isMounted) fetchScanHistory() })
+        socket.on('scan_started', () => { if (isMounted) fetchScanHistory() })
+        
+        if (!isMounted) {
+          // If component unmounted while we were importing, disconnect immediately
+          socket.disconnect()
+        } else {
+          socketInstance = socket
+        }
+      } catch (err) {
+        console.warn('Socket.io failed to initialize for ScanHistory', err)
+      }
+    }
+    
+    initSocket();
+
+    return () => {
+      isMounted = false;
+      if (socketInstance) socketInstance.disconnect()
+    }
   }, [userId])
 
   const getStatusIcon = (status) => {
@@ -316,9 +343,28 @@ const ScanHistory = ({ userId }) => {
               const cvss = getCvssScore(v.type || v.title || v.name, v.severity, v.cvss)
               const endpoint = escapeHtml(v.endpoint || scanData.domain || 'N/A')
               const parameter = escapeHtml(v.parameter || 'N/A')
-              const payload = escapeHtml(v.payload || 'N/A')
+              const payloadRaw = escapeHtml(v.payload || 'N/A')
               const proof = escapeHtml(v.proof || v.evidence || v.description || 'Verified during automated penetration testing.')
               const remediation = getRemediation(v.type || v.title || v.name)
+              
+              let payloadHtml = `<code>${payloadRaw}</code>`
+              if (v.zkp) {
+                payloadHtml = `<div style="background: rgba(0, 255, 136, 0.05); border: 1px dashed #00ff88; padding: 10px; border-radius: 6px; margin-top: 6px;">
+                  <div style="color: #00ff88; font-size: 11px; font-weight: bold; letter-spacing: 1px; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    ZKP COMMITMENT REDACTION
+                  </div>
+                  <code style="color: #00ff88; word-break: break-all; font-size: 12px; display: block;">${escapeHtml(v.zkp.commitment)}</code>
+                  <div style="font-size: 10px; color: #8a8d9a; margin-top: 6px;">Payload hidden until bounty is paid. Alg: ${escapeHtml(v.zkp.algorithm)}</div>
+                </div>`
+              } else if (payloadRaw.startsWith('[REDACTED_ZKP_COMMITMENT:')) {
+                const hash = payloadRaw.replace('[REDACTED_ZKP_COMMITMENT:', '').replace(']', '')
+                payloadHtml = `<div style="background: rgba(0, 255, 136, 0.05); border: 1px dashed #00ff88; padding: 10px; border-radius: 6px; margin-top: 6px;">
+                  <div style="color: #00ff88; font-size: 11px; font-weight: bold; letter-spacing: 1px; margin-bottom: 4px;">ZKP COMMITMENT REDACTION</div>
+                  <code style="color: #00ff88; word-break: break-all; font-size: 12px; display: block;">${hash}</code>
+                </div>`
+              }
+
               return `
                 <div class="vuln-card vuln-${severity.toLowerCase()}">
                   <div class="vuln-head">
@@ -331,12 +377,18 @@ const ScanHistory = ({ userId }) => {
                   <div class="vuln-meta-grid">
                     <div class="meta-item"><strong>Target URL / Endpoint:</strong> <code>${endpoint}</code></div>
                     ${parameter && parameter !== 'N/A' ? `<div class="meta-item"><strong>Vulnerable Parameter:</strong> <code>${parameter}</code></div>` : ''}
-                    ${payload && payload !== 'N/A' ? `<div class="meta-item"><strong>Test Payload:</strong> <code>${payload}</code></div>` : ''}
+                    ${payloadRaw !== 'N/A' ? `<div class="meta-item"><strong>Test Payload:</strong> ${payloadHtml}</div>` : ''}
                   </div>
                   <div class="vuln-desc-section">
                     <strong>Proof of Concept (PoC) Evidence:</strong>
                     <pre class="proof-box">${proof}</pre>
                   </div>
+                  ${v.poc?.codeSnippet?.python ? `
+                  <div class="remediation-section" style="margin-top: 15px; margin-bottom: 20px;">
+                    <strong><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00ccff" stroke-width="2" style="vertical-align: middle; margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Automated Exploit Script (Python):</strong>
+                    <pre class="proof-box" style="border-color: #00ccff; color: #00ccff;">${escapeHtml(v.poc.codeSnippet.python)}</pre>
+                  </div>
+                  ` : ''}
                   <div class="remediation-section">
                     <strong>Remediation Recommendation:</strong>
                     <p>${remediation}</p>
@@ -587,15 +639,21 @@ const ScanHistory = ({ userId }) => {
           </ResponsiveContainer>
         </div>
       )}
-
       {/* Scan History List */}
       <div className="scan-history-section">
         {loading ? (
-          <div className="loading-state">
-            <Loader size={24} className="spinner-icon" />
-            <p>Loading scan history...</p>
-          </div>
-        ) : filteredScans.length === 0 ? (
+        <div className="scans-list">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="scan-card skeleton" style={{ padding: '20px', borderBottom: '1px solid #333', display: 'flex', gap: '15px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#333', animation: 'pulse 1.5s infinite' }}></div>
+              <div style={{ flex: 1 }}>
+                <div style={{ width: '30%', height: '20px', background: '#333', borderRadius: '4px', marginBottom: '10px', animation: 'pulse 1.5s infinite' }}></div>
+                <div style={{ width: '60%', height: '14px', background: '#333', borderRadius: '4px', animation: 'pulse 1.5s infinite' }}></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredScans.length === 0 ? (
           <div className="empty-state">
             <AlertCircle size={48} />
             <h3>No scans found</h3>

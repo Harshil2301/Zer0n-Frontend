@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { 
-  Shield, 
-  Zap, 
-  Crown, 
-  Check, 
+import {
+  Shield,
+  Zap,
+  Crown,
+  Check,
   X,
   Sparkles,
   Target,
@@ -97,20 +97,20 @@ const PlanSelection = () => {
 
   const handleSelectPlan = async (plan) => {
     if (loading) return
-    
+
     console.log('Plan selected:', plan.id)
-    
+
     setLoading(true)
     setSelectedPlan(plan.id)
-    
+
     try {
       // For Basic and Pro plans - require wallet connection and signature
       if (plan.id === 'basic' || plan.id === 'pro') {
         console.log(`Processing ${plan.name} plan - checking for wallet...`)
-        
+
         // Check if Core wallet or other provider is available
         const provider = window.avalanche || window.ethereum;
-        
+
         if (!provider) {
           console.error('No wallet provider found')
           alert('Please install Core wallet extension to continue')
@@ -120,14 +120,14 @@ const PlanSelection = () => {
         }
 
         console.log('Requesting wallet connection...')
-        
+
         // Connect wallet
         const accounts = await provider.request({
           method: 'eth_requestAccounts'
         })
-        
+
         console.log('Accounts received:', accounts)
-        
+
         if (!accounts || accounts.length === 0) {
           alert('No wallet connected. Please connect your Core wallet.')
           setLoading(false)
@@ -137,7 +137,7 @@ const PlanSelection = () => {
 
         const userWallet = accounts[0]
         setWalletAddress(userWallet)
-        
+
         console.log('Wallet connected:', userWallet)
 
         // Auto-switch wallet to Avalanche Fuji Testnet (Chain ID: 43113 / 0xa869)
@@ -188,7 +188,7 @@ const PlanSelection = () => {
         // Web3 Security: Request Cryptographic Signature to verify wallet ownership
         console.log('Requesting wallet signature verification...')
         const message = `Welcome to ZerOn!\n\nPlease sign this message to verify ownership of this wallet and link it to your account.\n\nWallet: ${userWallet}\nTimestamp: ${Date.now()}`;
-        
+
         // Convert string to hex for personal_sign
         const msgHex = '0x' + Array.from(new TextEncoder().encode(message))
           .map(b => b.toString(16).padStart(2, '0'))
@@ -210,17 +210,17 @@ const PlanSelection = () => {
         }
 
         let txHash = 'basic_plan_no_tx';
-        
+
         // Only charge for 'pro' plan (e.g., 0.01 ETH/AVAX on Testnet)
         if (plan.id === 'pro') {
           console.log('Initiating testnet transaction...');
-          
+
           // 0.01 in hex wei (10000000000000000 wei)
-          const valueInWeiHex = '0x2386F26FC10000'; 
-          
+          const valueInWeiHex = '0x2386F26FC10000';
+
           // ZerOn Treasury Wallet (User's MetaMask)
           const companyWallet = '0x28F6CAbd2d5B3b125F98ce8A3410676B23485A0b';
-          
+
           const transactionParameters = {
             to: companyWallet,
             from: userWallet,
@@ -247,7 +247,7 @@ const PlanSelection = () => {
 
         // Store plan selection and transaction hash in Firebase
         const userRef = doc(db, 'users', userId)
-        
+
         await setDoc(userRef, {
           walletAddress: userWallet,
           transactionHash: txHash,
@@ -263,25 +263,28 @@ const PlanSelection = () => {
             status: 'active'
           }
         }, { merge: true })
-        
+
         console.log('Data stored successfully!')
+
+        // Force Dashboard to fetch fresh data
+        sessionStorage.removeItem('zeron_profile_cache')
 
         // Navigate to dashboard
         setTimeout(() => {
           console.log('Redirecting to dashboard...')
           navigate(`/dashboard?id=${userId}`)
         }, 1000)
-        
+
       } else {
         // For Enterprise plan (later implementation)
         alert('Enterprise plan will be available soon!')
         setLoading(false)
         setSelectedPlan(null)
       }
-      
+
     } catch (error) {
       console.error('Error selecting plan:', error)
-      
+
       if (error.code === 4001) {
         alert('Signature rejected. Please approve the signature to continue.')
       } else if (error.code === -32002) {
@@ -289,7 +292,7 @@ const PlanSelection = () => {
       } else {
         alert('Failed to select plan. Please try again.')
       }
-      
+
       setLoading(false)
       setSelectedPlan(null)
     }
@@ -299,7 +302,7 @@ const PlanSelection = () => {
     <div className="plan-selection-container">
       <div className="plans-container">
         {/* Header */}
-        <motion.div 
+        <motion.div
           className="plans-header"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -353,8 +356,8 @@ const PlanSelection = () => {
 
                 <div className="plan-card-features">
                   {plan.features.map((feature, idx) => (
-                    <div 
-                      key={idx} 
+                    <div
+                      key={idx}
                       className={`feature-row ${feature.included ? 'included' : 'excluded'}`}
                     >
                       {feature.included ? (

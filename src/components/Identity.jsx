@@ -513,7 +513,8 @@ const Identity = () => {
         
         // Also try to save via API (as backup)
         try {
-          const response = await fetch(`/api/user/${userId}/complete-profile`, {
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+          const response = await fetch(`${apiUrl}/api/user/${userId}/complete-profile`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(profileData)
@@ -962,7 +963,7 @@ const Identity = () => {
                     disabled={!canProceed() || isProcessing}
                   >
                     <Shield size={18} />
-                    {isProcessing ? 'Processing...' : 'Proceed to Face Scan'}
+                    {isProcessing ? 'Processing...' : 'Proceed to Dashboard'}
                     <ArrowRight size={18} />
                   </button>
                 </motion.div>

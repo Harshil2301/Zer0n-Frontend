@@ -4,7 +4,8 @@ import {
   collection, 
   addDoc, 
   query, 
-  getDocs 
+  getDocs,
+  where
 } from 'firebase/firestore';
 import { firebaseConfig } from '../config/firebase.config';
 
@@ -104,44 +105,20 @@ const generateSecureUUID = () => {
   });
 };
 
-// Function to store face vector in Firebase
-export const storeFaceVector = async (faceVector, userId = null) => {
-  if (!db) {
-    console.warn('Firebase is not available, skipping face vector storage');
-    return { success: false, uuid: userId || null };
-  }
-  
-  try {
-    if (!Array.isArray(faceVector)) {
-      throw new Error('Invalid face vector format');
-    }
-
-    // Use provided userId (UUID) or generate new one
-    const userUUID = userId || generateSecureUUID();
-    const timestamp = new Date().toISOString();
-    
-    const faceVectorsRef = collection(db, 'faceVectors');
-    
-    const docRef = await addDoc(faceVectorsRef, {
-      vector: faceVector,
-      timestamp: timestamp,
-      userId: userUUID, // Store the UUID here
-      uuid: userUUID    // Also store in uuid field for consistency
-    });
-
-    console.log('Successfully stored face vector with UUID:', userUUID);
-    console.log('Document ID:', docRef.id);
-    
-    return { 
-      success: true, 
-      uuid: userUUID,  // Return the UUID for reference
-      docId: docRef.id 
-    };
-  } catch (error) {
-    console.error('Error storing face vector:', error);
-    return { success: false, uuid: userId || null };
-  }
+// ⛔ DEPRECATED — DO NOT USE
+// This function previously wrote raw, unencrypted face vectors directly to
+// Firestore from the browser, bypassing AES-256 encryption on the backend.
+// This was a security vulnerability. All face enrollment MUST go through the
+// secure backend route: POST /api/face/enroll
+// See: FaceScan.jsx → handleVerificationComplete() for the correct implementation.
+export const storeFaceVector = async (_faceVector, _userId = null) => {
+  throw new Error(
+    '[ZerOn Security] storeFaceVector() is deprecated and disabled. ' +
+    'Use the backend API route POST /api/face/enroll instead. ' +
+    'Reason: direct Firestore writes bypass AES-256 biometric encryption.'
+  );
 };
+
 
 export const checkExistingFaceVector = async (faceVector) => {
   try {
@@ -248,7 +225,7 @@ export const getUserProfile = async (uuid) => {
     
     // Fallback: search for older documents created with addDoc (where ID != uuid but field uuid == uuid)
     const usersRef = collection(db, 'users');
-    const q = query(usersRef);
+    const q = query(usersRef, where('uuid', '==', uuid));
     const querySnapshot = await getDocs(q);
     
     let fallbackUser = null;

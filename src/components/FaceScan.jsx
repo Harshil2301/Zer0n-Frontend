@@ -42,9 +42,10 @@ const FaceScan = () => {
 
   // Face verification states
   const [modelsLoaded, setModelsLoaded] = useState(false)
-  const [blinkCount, setBlinkCount] = useState(0)
-  const [headVerification, setHeadVerification] = useState({ left: false, right: false })
-  const headVerificationRef = useRef({ left: false, right: false })
+  const [challengeSequence, setChallengeSequence] = useState([])
+  const [currentChallengeIndex, setCurrentChallengeIndex] = useState(0)
+  const challengeSequenceRef = useRef([])
+  const currentChallengeIndexRef = useRef(0)
   const [verificationComplete, setVerificationComplete] = useState(false)
   const [message, setMessage] = useState('Loading face detection models...')
   const [currentEAR, setCurrentEAR] = useState(0.35) // live EAR for the meter bar
@@ -189,6 +190,11 @@ const FaceScan = () => {
 
     loadModels()
 
+    // Static challenge sequence (No Randomness)
+    const staticSequence = ['blink', 'turn_left', 'turn_right']
+    setChallengeSequence(staticSequence)
+    challengeSequenceRef.current = staticSequence
+
     return () => {
       if (detectionIntervalRef.current) {
         clearInterval(detectionIntervalRef.current)
@@ -241,8 +247,13 @@ const FaceScan = () => {
 
     const video = videoRef.current
     const canvas = canvasRef.current
-    canvas.width = 720
-    canvas.height = 560
+    if (video.videoWidth > 0) {
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+    } else {
+      canvas.width = 720
+      canvas.height = 560
+    }
     loopActiveRef.current = true
 
     // ── EAR helpers (pixel-space) ─────────────────────────────────────────
@@ -271,10 +282,12 @@ const FaceScan = () => {
       // Safely initialize FaceMesh
       let faceMesh;
       try {
-        if (typeof window.FaceMesh !== 'function') {
-          throw new Error('FaceMesh constructor not found');
+        // Use the locally imported FaceMesh constructor from the package.
+        // DO NOT check window.FaceMesh — Vite bundles it locally, it's never on window.
+        if (typeof FaceMesh !== 'function') {
+          throw new Error('FaceMesh constructor not available from @mediapipe/face_mesh package');
         }
-        faceMesh = new window.FaceMesh({
+        faceMesh = new FaceMesh({
           locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
         })
       } catch (err) {
@@ -282,6 +295,7 @@ const FaceScan = () => {
         triggerFallback();
         return;
       }
+
 
       faceMesh.setOptions({
         maxNumFaces: 1,
@@ -344,115 +358,93 @@ const FaceScan = () => {
         // Calibrated threshold: 75% of their personal open-eye EAR
         const EAR_CLOSED = openEyeEAR * 0.75
 
-        // ── BLINK DETECTION ───────────────────────────────────────────────
-        if (blinkCountRef.current < 2) {
-          setMessage(`Please blink twice (${blinkCountRef.current}/2)`)
-          if (avgEAR < EAR_CLOSED) {
-            closedFramesRef.current++
-            eyesClosedRef.current = true
-          } else {
-            // Eyes just opened — check if counter is in valid blink range
-            const closedCount = closedFramesRef.current
+        // ── DYNAMIC CHALLENGE SEQUENCE ────────────────────────────────────
+        const currentAction = challengeSequenceRef.current[currentChallengeIndexRef.current]
 
-            // Minimum frames below threshold = confirmed blink
-            // More than 15 frames = eyes closed / sleeping, not a blink
-            if (closedCount >= 2 && closedCount <= 15) {
-              const now = Date.now()
-              if (now - lastBlinkTimeRef.current > 150) {  // 150ms cooldown for fast blinkers
-                lastBlinkTimeRef.current = now
-                const newCount = blinkCountRef.current + 1
-                blinkCountRef.current = newCount
-                setBlinkCount(newCount)
-                setScanningProgress(calculateProgress(newCount, undefined, undefined))
+        if (!currentAction && !verificationComplete) {
+          setMessage('Verification complete! Checking database...')
+          setVerificationComplete(true)
+          addTerminalLine('> Biometric scan complete ✓')
+          setScanningProgress(100)
+          handleVerificationComplete()
+          return
+        }
 
-                if (newCount === 2 && !messagesShownRef.current.blinkComplete) {
-                  messagesShownRef.current.blinkComplete = true
-                  setMessage('Blink verification complete! Now turn your head right')
-                  addTerminalLine(`> Blink detected (${newCount}/2)`)
-                  addTerminalLine('> Blink verification complete ✓')
-                  addTerminalLine('> Initiating head pose verification...')
-                } else if (newCount < 2) {
-                  setMessage(`Please blink twice (${newCount}/2)`)
-                  addTerminalLine(`> Blink detected (${newCount}/2)`)
+        if (currentAction) {
+          // Action descriptions
+          const actionText = {
+            'blink': 'BLINK your eyes twice',
+            'smile': 'SMILE broadly',
+            'turn_left': 'TURN HEAD LEFT',
+            'turn_right': 'TURN HEAD RIGHT'
+          }
+
+          if (message !== `Please ${actionText[currentAction]}`) {
+            setMessage(`Please ${actionText[currentAction]}`)
+          }
+
+          let actionPassed = false
+
+          if (currentAction === 'blink') {
+            if (avgEAR < EAR_CLOSED) {
+              closedFramesRef.current++
+              eyesClosedRef.current = true
+            } else {
+              const closedCount = closedFramesRef.current
+              if (closedCount >= 2 && closedCount <= 15) {
+                const now = Date.now()
+                if (now - lastBlinkTimeRef.current > 150) {
+                  lastBlinkTimeRef.current = now
+                  const newCount = blinkCountRef.current + 1
+                  blinkCountRef.current = newCount
+                  if (newCount >= 2) {
+                    actionPassed = true
+                    addTerminalLine('> Blink verification complete ✓')
+                  } else {
+                    setMessage(`Please BLINK your eyes twice (${newCount}/2)`)
+                  }
                 }
               }
+              closedFramesRef.current = 0
+              eyesClosedRef.current = false
             }
-            closedFramesRef.current = 0
-            eyesClosedRef.current = false
+          } else if (currentAction === 'smile') {
+            const mouthWidth = dist(px(lms, 61), px(lms, 291))
+            const faceWidth = Math.abs(px(lms, 234).x - px(lms, 454).x) + 1
+            const mouthRatio = mouthWidth / faceWidth
+            if (mouthRatio > 0.45) { // Threshold for wide smile
+              actionPassed = true
+              addTerminalLine('> Smile verification complete ✓')
+            }
+          } else if (currentAction === 'turn_left' || currentAction === 'turn_right') {
+            const noseTip = px(lms, 4)
+            const chin = px(lms, 152)
+            const leye = { x: (px(lms, 33).x + px(lms, 133).x) / 2, y: (px(lms, 33).y + px(lms, 133).y) / 2 }
+            const reye = { x: (px(lms, 362).x + px(lms, 263).x) / 2, y: (px(lms, 362).y + px(lms, 263).y) / 2 }
+            const eyeMidX = (leye.x + reye.x) / 2
+            const eyeSep = Math.abs(reye.x - leye.x) + 1
+            const noseDevX = (noseTip.x - eyeMidX) / eyeSep
+            const chinDev = (chin.x - eyeMidX) / eyeSep
+            const signal = noseDevX + chinDev
+
+            const turningLeft = signal < -0.12 || noseDevX < -0.15
+            const turningRight = signal > 0.12 || noseDevX > 0.15
+
+            if (currentAction === 'turn_left' && turningLeft) {
+              actionPassed = true
+              addTerminalLine('> Head turn left complete ✓')
+            } else if (currentAction === 'turn_right' && turningRight) {
+              actionPassed = true
+              addTerminalLine('> Head turn right complete ✓')
+            }
+          }
+
+          if (actionPassed) {
+            currentChallengeIndexRef.current++
+            setCurrentChallengeIndex(currentChallengeIndexRef.current)
+            setScanningProgress(Math.floor((currentChallengeIndexRef.current / challengeSequenceRef.current.length) * 100))
           }
         }
-
-        // ── HEAD POSE via nose deviation ──────────────────────────────────
-        if (blinkCountRef.current >= 2 && !verificationComplete) {
-          const noseTip = px(lms, 4)   // MediaPipe landmark 4 = nose tip (most stable)
-          const chin = px(lms, 152) // chin centre
-
-          const leye = { x: (px(lms, 33).x + px(lms, 133).x) / 2, y: (px(lms, 33).y + px(lms, 133).y) / 2 }
-          const reye = { x: (px(lms, 362).x + px(lms, 263).x) / 2, y: (px(lms, 362).y + px(lms, 263).y) / 2 }
-          const eyeMidX = (leye.x + reye.x) / 2
-          const eyeSep = Math.abs(reye.x - leye.x) + 1
-
-          const noseDevX = (noseTip.x - eyeMidX) / eyeSep
-          const chinDev = (chin.x - eyeMidX) / eyeSep
-          const signal = noseDevX + chinDev
-
-          // Original reliable logic (reverted)
-          const turningLeft = signal < -0.12 || noseDevX < -0.15
-          const turningRight = signal > 0.12 || noseDevX > 0.15
-
-          // Use a hold counter — require 4 consecutive frames to confirm (≈133ms)
-          if (!headVerificationRef.current.leftHoldCount) headVerificationRef.current.leftHoldCount = 0
-          if (!headVerificationRef.current.rightHoldCount) headVerificationRef.current.rightHoldCount = 0
-
-          if (!headVerificationRef.current.left) {
-            if (turningLeft) {
-              headVerificationRef.current.leftHoldCount++
-            } else {
-              headVerificationRef.current.leftHoldCount = 0
-            }
-            if (headVerificationRef.current.leftHoldCount >= 2 &&
-              !messagesShownRef.current.headLeftVerified) {
-              messagesShownRef.current.headLeftVerified = true
-              headVerificationRef.current.left = true
-              headVerificationRef.current.leftTime = Date.now()
-              headVerificationRef.current.leftHoldCount = 0
-              setHeadVerification(prev => ({ ...prev, left: true }))
-              setMessage('Great! Now return to center, then turn your head left')
-              addTerminalLine('> Head Right verified ✓')
-            }
-          }
-
-          const leftAgo = headVerificationRef.current.leftTime
-            ? Date.now() - headVerificationRef.current.leftTime : 0
-
-          if (headVerificationRef.current.left &&
-            !headVerificationRef.current.right &&
-            leftAgo > 800) {  // must wait 800ms after first turn before second registers
-            if (turningRight) {
-              headVerificationRef.current.rightHoldCount++
-            } else {
-              headVerificationRef.current.rightHoldCount = 0
-            }
-            if (headVerificationRef.current.rightHoldCount >= 2 &&
-              !messagesShownRef.current.headRightVerified) {
-              messagesShownRef.current.headRightVerified = true
-              headVerificationRef.current.right = true
-              headVerificationRef.current.rightHoldCount = 0
-              setHeadVerification(prev => ({ ...prev, right: true }))
-              setMessage('Verification complete! Checking database...')
-              setVerificationComplete(true)
-              addTerminalLine('> Head Left verified ✓')
-              addTerminalLine('> Biometric scan complete')
-              handleVerificationComplete()
-            }
-          }
-        }
-
-        setScanningProgress(calculateProgress(
-          blinkCountRef.current,
-          headVerificationRef.current.left,
-          headVerificationRef.current.right
-        ))
       })
 
       // Initialise and start frame loop
@@ -535,6 +527,8 @@ const FaceScan = () => {
   }
 
   const handleVerificationComplete = async () => {
+    if (isDetectingRef.current) return;
+    isDetectingRef.current = true;
     try {
       addTerminalLine('> Collecting 5 biometric samples for robust fingerprint...')
       setMessage('Hold still — collecting biometric samples...')
@@ -545,7 +539,7 @@ const FaceScan = () => {
       const ssdOptions = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 })
 
       for (let i = 0; i < 5; i++) {
-        await new Promise(r => setTimeout(r, 400)) // wait 400ms between samples
+        await new Promise(r => setTimeout(r, 100)) // wait 100ms between samples (fast capture)
         let result = await faceapi
           .detectSingleFace(videoRef.current, ssdOptions)
           .withFaceLandmarks()
@@ -565,7 +559,7 @@ const FaceScan = () => {
         } else {
           addTerminalLine(`> Sample ${i + 1}/5 — face not clear, retrying...`)
           // Retry this sample once
-          await new Promise(r => setTimeout(r, 300))
+          await new Promise(r => setTimeout(r, 100))
           let retry = await faceapi
             .detectSingleFace(videoRef.current, ssdOptions)
             .withFaceLandmarks()
@@ -694,7 +688,8 @@ const FaceScan = () => {
 
           // Fallback to API check
           try {
-            const response = await fetch(`/api/user/${existingFace.uuid}/check-complete`)
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+            const response = await fetch(`${apiUrl}/api/user/${existingFace.uuid}/check-complete`)
             const data = await response.json()
 
             isComplete = data.user &&
@@ -725,7 +720,7 @@ const FaceScan = () => {
 
           setTimeout(() => {
             redirectWithUUID('/dashboard', existingFace.uuid)
-          }, 1000)
+          }, 100)
         } else {
           // ✅ INCOMPLETE DATA - Create NEW session and redirect to identity page
           addTerminalLine('> Missing required fields')
@@ -741,7 +736,7 @@ const FaceScan = () => {
 
           setTimeout(() => {
             redirectWithUUID('/identity', existingFace.uuid)
-          }, 1000)
+          }, 100)
         }
 
       } else {
@@ -822,7 +817,7 @@ const FaceScan = () => {
 
           setTimeout(() => {
             redirectWithUUID('/identity', newUserId)
-          }, 1500)
+          }, 100)
         } else {
           addTerminalLine('> ⚠ Firebase unavailable')
           addTerminalLine('> Proceeding with UUID anyway...')
@@ -835,7 +830,7 @@ const FaceScan = () => {
 
           setTimeout(() => {
             redirectWithUUID('/identity', newUserId)
-          }, 1500)
+          }, 100)
         }
       }
 

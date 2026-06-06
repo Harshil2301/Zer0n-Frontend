@@ -118,6 +118,35 @@ const Dashboard = () => {
         return
       }
 
+      // Check cache first
+      const cachedProfileStr = sessionStorage.getItem('zeron_profile_cache');
+      if (cachedProfileStr) {
+        try {
+          const cachedProfile = JSON.parse(cachedProfileStr);
+          // Check TTL (5 minutes)
+          if (Date.now() - cachedProfile.timestamp < 5 * 60 * 1000 && cachedProfile.userId === userId) {
+            console.log('User data loaded from session cache');
+            setUserData(cachedProfile.data);
+            setSelectedPlan(cachedProfile.data.account?.plan || 'basic');
+            if (cachedProfile.data.plan && cachedProfile.data.plan.type) {
+              setHasPlan(true);
+            } else {
+              setHasPlan(false);
+            }
+            
+            // Check completeness
+            const profile = cachedProfile.data.profile || cachedProfile.data;
+            const isComplete = profile?.fullName && profile?.email && profile?.organization;
+            if (!isComplete) {
+              navigate(`/identity?id=${userId}`);
+            }
+            return;
+          }
+        } catch (e) {
+          console.warn('Failed to parse profile cache', e);
+        }
+      }
+
       // Try to load from Firebase first
       let dataLoaded = false
       try {
@@ -128,6 +157,12 @@ const Dashboard = () => {
           console.log('User data loaded from Firebase:', result.user)
           setUserData(result.user)
           setSelectedPlan(result.user.account?.plan || 'basic')
+          
+          sessionStorage.setItem('zeron_profile_cache', JSON.stringify({
+            userId,
+            timestamp: Date.now(),
+            data: result.user
+          }));
 
           // Check if user has selected a plan
           if (result.user.plan && result.user.plan.type) {
@@ -166,6 +201,12 @@ const Dashboard = () => {
           if (data.success && data.user) {
             setUserData(data.user)
             setSelectedPlan(data.user.account?.plan || 'basic')
+
+            sessionStorage.setItem('zeron_profile_cache', JSON.stringify({
+              userId,
+              timestamp: Date.now(),
+              data: data.user
+            }));
 
             // Check if user has selected a plan
             if (data.user.plan && data.user.plan.type) {

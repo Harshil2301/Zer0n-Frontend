@@ -37,7 +37,8 @@ const SettingsPage = ({ userData, userId, onSave }) => {
     emailNotifications: true,
     scanAlerts: true,
     securityUpdates: true,
-    weeklyReport: false
+    weeklyReport: false,
+    webhookUrl: ''
   })
   const [theme, setTheme] = useState(() => localStorage.getItem('zeron_theme') || 'dark')
   const { language, setLanguage, t } = useLanguage()
@@ -62,6 +63,15 @@ const SettingsPage = ({ userData, userId, onSave }) => {
         role: profile.role || '',
         location: profile.location || ''
       })
+      if (userData.notifications) {
+        setNotifications({
+          emailNotifications: userData.notifications.emailNotifications ?? true,
+          scanAlerts: userData.notifications.scanAlerts ?? true,
+          securityUpdates: userData.notifications.securityUpdates ?? true,
+          weeklyReport: userData.notifications.weeklyReport ?? false,
+          webhookUrl: userData.notifications.webhookUrl ?? ''
+        })
+      }
     }
   }, [userData])
 
@@ -70,8 +80,11 @@ const SettingsPage = ({ userData, userId, onSave }) => {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleNotificationChange = (key) => {
-    setNotifications(prev => ({ ...prev, [key]: !prev[key] }))
+  const handleNotificationChange = (key, value = undefined) => {
+    setNotifications(prev => ({ 
+      ...prev, 
+      [key]: value !== undefined ? value : !prev[key] 
+    }))
   }
 
   const handlePasswordChange = (e) => {
@@ -102,7 +115,7 @@ const SettingsPage = ({ userData, userId, onSave }) => {
     }
   }
 
-  const handleSavePassword = () => {
+  const handleSavePassword = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setSaveMessage({ type: 'error', text: 'Passwords do not match' })
       setTimeout(() => setSaveMessage(null), 3000)
@@ -115,14 +128,53 @@ const SettingsPage = ({ userData, userId, onSave }) => {
       return
     }
 
-    setSaveMessage({ type: 'success', text: 'Password updated successfully!' })
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
-    setTimeout(() => setSaveMessage(null), 3000)
+    setIsSaving(true);
+    try {
+      const { getAuth, EmailAuthProvider, reauthenticateWithCredential, updatePassword } = await import('firebase/auth');
+      const auth = getAuth();
+      const user = auth.currentUser;
+
+      if (!user || !user.email) {
+        setSaveMessage({ type: 'error', text: 'Password changes are only available for email/password accounts.' });
+        return;
+      }
+
+      const credential = EmailAuthProvider.credential(user.email, passwordData.currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, passwordData.newPassword);
+
+      setSaveMessage({ type: 'success', text: 'Password updated successfully!' })
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    } catch (error) {
+      console.error('Password update error:', error);
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setSaveMessage({ type: 'error', text: 'Incorrect current password' });
+      } else {
+        setSaveMessage({ type: 'error', text: 'Failed to update password' });
+      }
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setSaveMessage(null), 3000)
+    }
   }
 
-  const handleSaveNotifications = () => {
-    setSaveMessage({ type: 'success', text: 'Notification preferences saved!' })
-    setTimeout(() => setSaveMessage(null), 3000)
+  const handleSaveNotifications = async () => {
+    setIsSaving(true);
+    try {
+      const { db } = await import('../config/firebase');
+      const { doc, setDoc } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', userId);
+      
+      await setDoc(docRef, { notifications }, { merge: true });
+      
+      setSaveMessage({ type: 'success', text: 'Notification preferences saved!' })
+    } catch (error) {
+      console.error('Error saving notifications:', error);
+      setSaveMessage({ type: 'error', text: 'Failed to save preferences' });
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setSaveMessage(null), 3000)
+    }
   }
 
   const sections = [
@@ -455,11 +507,40 @@ const SettingsPage = ({ userData, userId, onSave }) => {
                     <span className="toggle-slider-dash"></span>
                   </label>
                 </div>
+
+                <div className="notification-item-settings-dash" style={{ borderTop: '1px solid #333', paddingTop: '20px', marginTop: '10px', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <div className="notification-info-dash" style={{ marginBottom: '15px' }}>
+                    <Globe size={20} />
+                    <div>
+                      <h4>Webhook URL</h4>
+                      <p>Send POST requests to this URL when a scan completes</p>
+                    </div>
+                  </div>
+                  <input
+                    type="url"
+                    placeholder="https://your-webhook-endpoint.com/..."
+                    value={notifications.webhookUrl}
+                    onChange={(e) => handleNotificationChange('webhookUrl', e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid #444',
+                      padding: '12px 15px',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontSize: '0.9rem',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                </div>
               </div>
 
-              <button className="save-btn-dash" onClick={handleSaveNotifications}>
-                <Save size={18} />
-                Save Preferences
+              <button className="save-btn-dash" onClick={handleSaveNotifications} disabled={isSaving}>
+                {isSaving ? (
+                  <span className="loading-spinner"></span>
+                ) : (
+                  <><Save size={18} /> Save Preferences</>
+                )}
               </button>
             </motion.div>
           )}

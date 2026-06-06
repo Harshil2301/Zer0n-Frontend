@@ -24,6 +24,9 @@ const NewScan = ({ userId, onNavigate }) => {
   const [terminalLogs, setTerminalLogs] = useState([])
   const [scanCompleted, setScanCompleted] = useState(false)
   const [scanSummary, setScanSummary] = useState(null)
+  const [verificationRequired, setVerificationRequired] = useState(false)
+  const [dnsChallenge, setDnsChallenge] = useState('')
+  const [verifyingDomain, setVerifyingDomain] = useState(false)
   const logsEndRef = useRef(null)
 
   // Auto-scroll terminal
@@ -161,6 +164,7 @@ const NewScan = ({ userId, onNavigate }) => {
       })
 
       if (!response.ok) {
+
         throw new Error('Failed to start scan')
       }
 
@@ -216,6 +220,33 @@ const NewScan = ({ userId, onNavigate }) => {
       setError('Failed to initiate scan. Please check your connection and try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleVerifyDomain = async () => {
+    setVerifyingDomain(true);
+    setError('');
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/domain/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain, userId })
+      });
+      const data = await response.json();
+      
+      if (data.verified) {
+        setVerificationRequired(false);
+        setError('');
+        // Automatically start scan after successful verification
+        handleScan();
+      } else {
+        setError(data.error || 'Verification failed. Please ensure the TXT record is added and try again.');
+      }
+    } catch (err) {
+      setError('Failed to verify domain. Please check your connection.');
+    } finally {
+      setVerifyingDomain(false);
     }
   }
 
@@ -376,12 +407,14 @@ const NewScan = ({ userId, onNavigate }) => {
           />
           <button 
             onClick={handleScan}
-            disabled={loading || !domain.trim()}
+            disabled={loading || !domain.trim() || (activeScanId && !scanCompleted)}
             className="send-scan-btn deploy-agent-btn"
             style={{ width: 'auto', padding: '0 20px', display: 'flex', gap: '8px', fontSize: '0.9rem', fontWeight: 'bold' }}
           >
             {loading ? (
               <span className="loading-spinner"></span>
+            ) : activeScanId && !scanCompleted ? (
+              <><Activity size={16} className="pulsing" /> Scan in Progress...</>
             ) : (
               <><Send size={16} /> Deploy Autonomous Agent</>
             )}
@@ -434,6 +467,7 @@ const NewScan = ({ userId, onNavigate }) => {
             <span>{error}</span>
           </div>
         )}
+
 
         {userPlan && (
           <div className="scan-info">
@@ -502,6 +536,27 @@ const NewScan = ({ userId, onNavigate }) => {
           </div>
         </div>
       )}
+
+      {/* Ethical / Rules of Engagement Disclaimer - Moved to Bottom */}
+      <div style={{
+        marginTop: '2rem',
+        padding: '12px 16px',
+        background: 'rgba(255, 45, 85, 0.05)',
+        border: '1px solid rgba(255, 45, 85, 0.2)',
+        borderLeft: '4px solid #ff2d55',
+        borderRadius: '8px',
+        display: 'flex',
+        gap: '12px',
+        alignItems: 'flex-start'
+      }}>
+        <AlertCircle size={18} color="#ff2d55" style={{ marginTop: '2px', flexShrink: 0 }} />
+        <div style={{ fontSize: '0.85rem', color: '#d1d4dc', lineHeight: '1.5' }}>
+          <strong style={{ color: '#ff2d55', display: 'block', marginBottom: '4px' }}>Rules of Engagement & Authorization</strong>
+          To comply with the <em>Computer Fraud and Abuse Act (CFAA)</em>, unauthorized scanning of production environments is strictly prohibited. 
+          Furthermore, enterprise Web Application Firewalls (WAFs) will automatically ban unwhitelisted IPs. 
+          For demonstration and academic evaluation, please use authorized vulnerable testing environments only (e.g., <code style={{ color: '#00d4ff', background: 'rgba(0,212,255,0.1)', padding: '2px 4px', borderRadius: '4px' }}>testfire.net</code> or <code style={{ color: '#00d4ff', background: 'rgba(0,212,255,0.1)', padding: '2px 4px', borderRadius: '4px' }}>juice-shop.herokuapp.com</code>).
+        </div>
+      </div>
     </div>
   )
 }

@@ -10,6 +10,7 @@ import Features from './components/Features'
 import DualAudience from './components/DualAudience'
 import LiveDemo from './components/LiveDemo'
 import Footer from './components/Footer'
+import ErrorBoundary from './components/ErrorBoundary'
 import './App.css'
 
 // ── Lazy imports (loaded only when user navigates to those routes) ────────────
@@ -80,20 +81,22 @@ function App() {
     <div className="App">
       <Router>
         <ScrollToTop />
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={<HomePageWithLoader />} />
-            <Route path="/identity" element={<IdentityPage />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/face-scan" element={<FaceScan />} />
-            <Route path="/plan-selection" element={<PlanSelection />} />
-            <Route path="/roadmap" element={<Roadmap />} />
-            <Route path="/whitepaper" element={<Whitepaper />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/documentation" element={<Documentation />} />
-            <Route path="/download" element={<DownloadCenter />} />
-          </Routes>
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<HomePageWithLoader />} />
+              <Route path="/identity" element={<IdentityPage />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/face-scan" element={<FaceScan />} />
+              <Route path="/plan-selection" element={<PlanSelection />} />
+              <Route path="/roadmap" element={<Roadmap />} />
+              <Route path="/whitepaper" element={<Whitepaper />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/documentation" element={<Documentation />} />
+              <Route path="/download" element={<DownloadCenter />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </Router>
     </div>
   )
