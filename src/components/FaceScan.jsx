@@ -292,17 +292,16 @@ const FaceScan = () => {
           locateFile: (file) => `https://unpkg.com/@mediapipe/face_mesh@0.4.1633559619/${file}`
         })
       } catch (err) {
-        console.warn('MediaPipe FaceMesh failed to construct, falling back...', err);
-        triggerFallback();
+        console.warn('MediaPipe FaceMesh failed to construct, no fallback available.', err);
+        addTerminalLine('> MediaPipe unavailable — face-api.js is handling detection')
         return;
       }
 
-      // Safety timeout — if MediaPipe takes longer than 15s to init, trigger fallback
+      // Safety timeout — if MediaPipe takes longer than 15s to init, log a warning
       const initTimeout = setTimeout(() => {
         if (!mpReady) {
-          console.warn('[FaceScan] MediaPipe init timed out after 15s — falling back to face-api.js');
-          addTerminalLine('> MediaPipe timed out — switching to face-api.js fallback...')
-          triggerFallback();
+          console.warn('[FaceScan] MediaPipe init timed out after 15s');
+          addTerminalLine('> MediaPipe is taking longer than expected to initialize...')
         }
       }, 15000);
 
@@ -341,7 +340,9 @@ const FaceScan = () => {
         if (faceWidth < 160) {
           setMessage('Face not clear. Please move closer to the camera.')
           return // Stop processing until they move closer
-        } else if (blinkCountRef.current === 0 && message !== 'Please blink twice (0/2)') {
+        }
+        // Only show this default message AFTER calibration is complete
+        else if (baselineSamplesRef.current >= 60 && blinkCountRef.current === 0 && message !== 'Please blink twice (0/2)') {
           setMessage('Please blink twice (0/2)')
         }
 
@@ -473,17 +474,9 @@ const FaceScan = () => {
         // Small delay for camera to stabilise
         setTimeout(() => { rafId = requestAnimationFrame(sendFrame) }, 500)
       }).catch(async () => {
-        addTerminalLine('> MediaPipe init failed — falling back to face-api.js')
-        // Fallback: manually trigger the face-api.js models since mesh failed
-        try {
-          await faceapi.nets.ssdMobilenetv1.loadFromUri('/models')
-          await faceapi.nets.faceLandmark68Net.loadFromUri('/models')
-          addTerminalLine('> Face-api.js fallback loaded successfully')
-          setModelsLoaded(true)
-        } catch (err) {
-          addTerminalLine('> CRITICAL: Both primary and fallback biometrics failed.')
-          setHasError(true)
-        }
+        clearTimeout(initTimeout)
+        addTerminalLine('> MediaPipe init failed — face-api.js is handling detection')
+        console.warn('[FaceScan] MediaPipe initialize() failed in production')
       })
 
       // Cleanup
