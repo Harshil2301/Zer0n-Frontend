@@ -287,14 +287,24 @@ const FaceScan = () => {
         if (typeof FaceMesh !== 'function') {
           throw new Error('FaceMesh constructor not available from @mediapipe/face_mesh package');
         }
+        // Using unpkg CDN — more reliable WASM delivery than jsDelivr for production
         faceMesh = new FaceMesh({
-          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`
+          locateFile: (file) => `https://unpkg.com/@mediapipe/face_mesh@0.4.1633559619/${file}`
         })
       } catch (err) {
         console.warn('MediaPipe FaceMesh failed to construct, falling back...', err);
         triggerFallback();
         return;
       }
+
+      // Safety timeout — if MediaPipe takes longer than 15s to init, trigger fallback
+      const initTimeout = setTimeout(() => {
+        if (!mpReady) {
+          console.warn('[FaceScan] MediaPipe init timed out after 15s — falling back to face-api.js');
+          addTerminalLine('> MediaPipe timed out — switching to face-api.js fallback...')
+          triggerFallback();
+        }
+      }, 15000);
 
 
       faceMesh.setOptions({
@@ -449,6 +459,7 @@ const FaceScan = () => {
 
       // Initialise and start frame loop
       faceMesh.initialize().then(() => {
+        clearTimeout(initTimeout)
         mpReady = true
         addTerminalLine('> MediaPipe Face Mesh loaded (468 landmarks @ 30fps)')
 
