@@ -275,17 +275,15 @@ const FaceScan = () => {
     let rafId = null
     let noFaceFrames = 0
 
-    // Dynamic import so we don't block initial render
-    import('@mediapipe/face_mesh').then(({ FaceMesh }) => {
+    // Use FaceMesh globally to prevent Vite Rollup minification bugs in production
+    const initializeMediaPipe = () => {
       if (!loopActiveRef.current) return
 
-      // Safely initialize FaceMesh
+      // Safely initialize FaceMesh from the global window object loaded via index.html
       let faceMesh;
       try {
-        // Use the locally imported FaceMesh constructor from the package.
-        // DO NOT check window.FaceMesh — Vite bundles it locally, it's never on window.
-        if (typeof FaceMesh !== 'function') {
-          throw new Error('FaceMesh constructor not available from @mediapipe/face_mesh package');
+        if (typeof window.FaceMesh !== 'function') {
+          throw new Error('FaceMesh global not found');
         }
         // Using unpkg CDN — more reliable WASM delivery than jsDelivr for production
         faceMesh = new FaceMesh({
@@ -485,7 +483,9 @@ const FaceScan = () => {
         if (rafId) cancelAnimationFrame(rafId)
         faceMesh.close()
       }
-    })
+    }
+
+    initializeMediaPipe()
 
     return () => {
       loopActiveRef.current = false
