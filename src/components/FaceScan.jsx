@@ -288,7 +288,7 @@ const FaceScan = () => {
           throw new Error('FaceMesh constructor not available from @mediapipe/face_mesh package');
         }
         faceMesh = new FaceMesh({
-          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`
         })
       } catch (err) {
         console.warn('MediaPipe FaceMesh failed to construct, falling back...', err);
