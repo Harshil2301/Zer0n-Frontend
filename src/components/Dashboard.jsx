@@ -17,7 +17,8 @@ import {
   Bold,
   ChevronLeft,
   ChevronRight,
-  Loader
+  Loader,
+  Globe
 } from 'lucide-react'
 import { getUUIDFromURL } from '../utils/uuid'
 import ProfileModal from './ProfileModal'
@@ -25,6 +26,7 @@ import NotificationPanel from './NotificationPanel'
 import SettingsPage from './SettingsPage'
 import PlanWarningBanner from './PlanWarningBanner'
 import ErrorBoundary from './ErrorBoundary'
+import ThreatFeed from './ThreatFeed'
 import { useLanguage } from '../contexts/LanguageContext'
 import './Dashboard.css'
 
@@ -358,6 +360,17 @@ const Dashboard = () => {
                     {sidebarOpen && <span>{t('transactions')}</span>}
                   </button>
 
+                  <button
+                    className={`nav-item ${activeTab === 'threats' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('threats')}
+                    data-tooltip="Threat Intel"
+                  >
+                    <div className="nav-icon">
+                      <Globe size={20} />
+                    </div>
+                    {sidebarOpen && <span>Threat Intel</span>}
+                  </button>
+
                   <div className="nav-divider"></div>
 
                   <button
@@ -444,6 +457,24 @@ const Dashboard = () => {
                     className="dashboard-content-section"
                   >
                     <ScanHistory userId={userId} />
+                  </motion.div>
+                </div>
+
+                {/* Threat Intel Tab */}
+                <div style={{ display: activeTab === 'threats' ? 'block' : 'none' }}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: activeTab === 'threats' ? 1 : 0, y: activeTab === 'threats' ? 0 : 20 }}
+                    transition={{ duration: 0.3 }}
+                    className="dashboard-content-section"
+                  >
+                    <div className="section-header-dash" style={{ marginBottom: '24px' }}>
+                      <div className="section-header-content-dash">
+                        <h2 className="section-title-dash">Global Threat Intelligence</h2>
+                        <p className="section-subtitle-dash">Real-time CVE zero-day vulnerability monitoring feed</p>
+                      </div>
+                    </div>
+                    <ThreatFeed />
                   </motion.div>
                 </div>
 

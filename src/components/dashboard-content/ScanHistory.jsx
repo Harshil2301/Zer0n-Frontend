@@ -3,11 +3,15 @@ import { Filter, Download, ExternalLink, Clock, CheckCircle, AlertCircle, Loader
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts'
+import ScanCompareModal from './ScanCompareModal'
 
 const ScanHistory = ({ userId }) => {
   const [scans, setScans] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, completed, started
+  const [compareMode, setCompareMode] = useState(false)
+  const [selectedScans, setSelectedScans] = useState([])
+  const [showCompareModal, setShowCompareModal] = useState(false)
 
   useEffect(() => {
     const fetchScanHistory = async () => {
@@ -596,6 +600,17 @@ const ScanHistory = ({ userId }) => {
           </div>
         </div>
         <div className="header-actions-dash">
+          <button 
+            className={`action-btn-dash ${compareMode ? 'secondary-dash' : ''}`} 
+            onClick={() => {
+              setCompareMode(!compareMode)
+              setSelectedScans([])
+            }}
+            style={compareMode ? { background: 'rgba(0, 204, 255, 0.1)', color: '#00ccff', border: '1px solid rgba(0, 204, 255, 0.3)' } : {}}
+          >
+            <Filter size={18} />
+            {compareMode ? 'Cancel Compare' : 'Compare Scans'}
+          </button>
           <select 
             className="filter-select"
             value={filter}
@@ -660,11 +675,70 @@ const ScanHistory = ({ userId }) => {
             <p>Start scanning domains to see your history here</p>
           </div>
         ) : (
-          <div className="scan-history-list">
+          <div className="scan-history-list relative">
+            
+            {/* Compare Floating Action Button */}
+            {compareMode && (
+              <div style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px',
+                marginBottom: '16px',
+                background: 'rgba(0,0,0,0.8)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(0,204,255,0.3)',
+                borderRadius: '8px',
+                boxShadow: '0 4px 20px rgba(0,204,255,0.15)'
+              }}>
+                <div style={{ fontSize: '14px', fontFamily: 'monospace', color: '#00ccff', fontWeight: 'bold' }}>
+                  {selectedScans.length} / 2 SCANS SELECTED
+                </div>
+                <button
+                  onClick={() => setShowCompareModal(true)}
+                  disabled={selectedScans.length !== 2}
+                  style={{
+                    padding: '8px 24px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: '#000',
+                    background: '#00ccff',
+                    borderRadius: '4px',
+                    border: 'none',
+                    cursor: selectedScans.length === 2 ? 'pointer' : 'not-allowed',
+                    opacity: selectedScans.length === 2 ? 1 : 0.5,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => { if(selectedScans.length === 2) e.currentTarget.style.opacity = 0.8 }}
+                  onMouseOut={(e) => { if(selectedScans.length === 2) e.currentTarget.style.opacity = 1 }}
+                >
+                  RUN DIFFERENTIAL ANALYSIS
+                </button>
+              </div>
+            )}
+
             {filteredScans.map((scan, index) => (
-              <div key={scan.scanId || index} className="scan-history-item">
+              <div key={scan.scanId || index} className="scan-history-item" style={compareMode && selectedScans.includes(scan.scanId) ? { border: '1px solid rgba(0,204,255,0.5)', background: 'rgba(0,204,255,0.05)' } : {}}>
                 <div className="scan-item-header">
                   <div className="scan-info-group">
+                    {compareMode && (
+                      <input 
+                        type="checkbox"
+                        className="mr-3 w-4 h-4 accent-[#00ccff] cursor-pointer"
+                        checked={selectedScans.includes(scan.scanId)}
+                        disabled={!selectedScans.includes(scan.scanId) && selectedScans.length >= 2}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedScans([...selectedScans, scan.scanId])
+                          } else {
+                            setSelectedScans(selectedScans.filter(id => id !== scan.scanId))
+                          }
+                        }}
+                      />
+                    )}
                     <h4 className="scan-domain">{scan.domain}</h4>
                     <div className="scan-meta">
                       <Clock size={14} />
@@ -730,6 +804,14 @@ const ScanHistory = ({ userId }) => {
           </div>
         )}
       </div>
+
+      {showCompareModal && selectedScans.length === 2 && (
+        <ScanCompareModal 
+          scan1Id={selectedScans[0]}
+          scan2Id={selectedScans[1]}
+          onClose={() => setShowCompareModal(false)}
+        />
+      )}
     </div>
   )
 }

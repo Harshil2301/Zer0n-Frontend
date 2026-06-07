@@ -97,6 +97,10 @@ const Contact = () => {
     {
       name: "Pushti Vyas",
       email: "pushti@zeronprotocol.com",
+    },
+    {
+      name: "Prayers Khristi",
+      email: "prayers@zeronprotocol.com",
     }
   ];
 
