@@ -550,6 +550,7 @@ const Identity = () => {
         
         // Also try to save via API (as backup)
         let apiSaved = false
+        let canonicalUserId = userId // default to current UUID
         try {
           const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
           const response = await fetch(`${apiUrl}/api/user/${userId}/complete-profile`, {
@@ -563,6 +564,15 @@ const Identity = () => {
           if (data.success) {
             console.log('Profile saved via API')
             apiSaved = true
+            // Backend may return a canonicalUserId if it found an existing account with this email
+            // This ensures we always redirect to the REAL account, not a blank duplicate
+            if (data.canonicalUserId && data.canonicalUserId !== userId) {
+              console.log('[Identity] Backend merged account. Switching to canonical UUID:', data.canonicalUserId)
+              canonicalUserId = data.canonicalUserId
+              localStorage.setItem('userId', canonicalUserId)
+              localStorage.setItem('sessionId', 'session-' + canonicalUserId + '-' + Date.now())
+              sessionStorage.removeItem('zeron_profile_cache') // Clear stale cache
+            }
           }
         } catch (apiError) {
           console.log('API save failed:', apiError)
@@ -572,9 +582,9 @@ const Identity = () => {
         if (firebaseSaved || apiSaved) {
           setSuccessMessage('Profile saved successfully!')
           
-          // Redirect to dashboard with UUID after short delay
+          // Redirect to the canonical account dashboard (may differ from current UUID)
           setTimeout(() => {
-            redirectWithUUID('/dashboard', userId)
+            redirectWithUUID('/dashboard', canonicalUserId)
           }, 1000)
         } else {
           setErrorMessage('Failed to save profile. Please try again.')
