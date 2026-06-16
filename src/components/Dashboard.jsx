@@ -20,7 +20,8 @@ import {
   Loader,
   Globe,
   ShieldAlert,
-  Home
+  Home,
+  X
 } from 'lucide-react'
 import { getUUIDFromURL } from '../utils/uuid'
 import ProfileModal from './ProfileModal'
@@ -267,6 +268,13 @@ const Dashboard = () => {
         {/* Top Header */}
         <header className="dashboard-header">
           <div className="header-left">
+            <button 
+              className="mobile-menu-btn" 
+              onClick={() => setSidebarOpen(true)}
+              title="Open Menu"
+            >
+              <Menu size={24} />
+            </button>
             <div className="header-logo">
               <img
                 src="/assets/zeron-logo.png"
@@ -293,6 +301,14 @@ const Dashboard = () => {
           </div>
         </header>
 
+        {/* Sidebar Backdrop for Mobile */}
+        {sidebarOpen && (
+          <div 
+            className="sidebar-backdrop" 
+            onClick={() => setSidebarOpen(false)}
+          ></div>
+        )}
+
         {/* Sidebar */}
         <AnimatePresence>
           {true && (
@@ -313,8 +329,15 @@ const Dashboard = () => {
                     />
                   </div>
                   {sidebarOpen && (
-                    <span className="portal-text"><bold>Dashboard</bold></span>
+                    <span className="portal-text"><b>Dashboard</b></span>
                   )}
+                  <button 
+                    className="mobile-close-btn"
+                    onClick={() => setSidebarOpen(false)}
+                    title="Close Menu"
+                  >
+                    <X size={20} />
+                  </button>
                 </div>
 
                 <nav className="sidebar-nav">

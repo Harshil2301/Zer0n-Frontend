@@ -154,9 +154,9 @@ const NewScan = ({ userId, onNavigate }) => {
       return
     }
 
-    // Check plan limits
-    if (!userPlan) {
-      setError('No plan selected. Please select a plan first.')
+    // Check if the user has formally selected a plan
+    if (!userPlan || !userPlan.name || !userPlan.domains) {
+      setError('No plan selected. Please click "Select Plan" to unlock scanning.')
       return
     }
 
@@ -429,7 +429,7 @@ const NewScan = ({ userId, onNavigate }) => {
         )}
 
 
-        {userPlan && (
+        {userPlan && userPlan.name && userPlan.domains && (
           <div className="scan-info">
             <span className="plan-badge">{userPlan.name}</span>
             <span className="scan-limit">

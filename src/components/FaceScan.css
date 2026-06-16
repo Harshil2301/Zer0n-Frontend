@@ -193,21 +193,30 @@
   border-radius: 0 0 8px 0;
 }
 
-/* Scanning Line Animation */
+/* Scanning Line Animation (Hardware Accelerated) */
 .scan-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  animation: scanDown 3s infinite linear;
+}
+
+.scan-line::before {
+  content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 2px;
   background: linear-gradient(90deg, transparent, #00ff00, transparent);
-  animation: scanDown 3s infinite linear;
   box-shadow: 0 0 10px #00ff00;
 }
 
 @keyframes scanDown {
-  0% { top: 0%; }
-  100% { top: 100%; }
+  0% { transform: translateY(-5%); }
+  100% { transform: translateY(105%); }
 }
 
 /* Camera Info */
@@ -599,6 +608,9 @@
   .face-scan-box {
     padding: 1.5rem;
     border-radius: 16px;
+    height: auto !important;
+    min-height: calc(100vh - 2rem);
+    overflow-y: auto;
   }
 
   .scan-header {

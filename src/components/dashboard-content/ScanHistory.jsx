@@ -683,7 +683,7 @@ const ScanHistory = ({ userId }) => {
       {/* Analytics Chart (Only show if we have data) */}
       {!loading && statsData.length > 0 && (
         <div style={{ width: '100%', height: '200px', marginBottom: '2rem', background: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', padding: '1rem' }}>
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={100}>
             <PieChart>
               <Pie
                 data={statsData}

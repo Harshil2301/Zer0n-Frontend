@@ -1033,19 +1033,17 @@ const FaceScan = () => {
               ))}
             </div>
 
-            {/* 2FA Fallback Button — sticky below terminal, always visible during scan */}
-            {!verificationComplete && (
-              <div style={{ padding: '0.6rem 1rem', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#0a0a0a', flexShrink: 0, marginTop: 'auto' }}>
-                <button
-                  onClick={() => window.location.href = '/identity'}
-                  style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#ccc', border: '1px solid rgba(255,255,255,0.2)', padding: '7px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', width: '100%', justifyContent: 'center', transition: 'background 0.2s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                >
-                  <Lock size={14} /> Scan failed? Use 2FA Backup Login
-                </button>
-              </div>
-            )}
+            {/* 2FA Fallback Button — sticky below terminal, always visible */}
+            <div style={{ padding: '0.6rem 1rem', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#0a0a0a', flexShrink: 0, marginTop: 'auto' }}>
+              <button
+                onClick={() => window.location.href = '/identity'}
+                style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#ccc', border: '1px solid rgba(255,255,255,0.2)', padding: '7px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', width: '100%', justifyContent: 'center', transition: 'background 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+              >
+                <Lock size={14} /> Scan failed? Use 2FA Backup Login
+              </button>
+            </div>
           </div>
         </div>
 

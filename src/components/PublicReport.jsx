@@ -157,11 +157,11 @@ const PublicReport = () => {
   });
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#d4d4d4', fontFamily: '"JetBrains Mono", monospace', padding: '2rem' }}>
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#d4d4d4', fontFamily: '"JetBrains Mono", monospace', padding: 'min(2rem, 5vw)' }}>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         
         {/* Header */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src="/assets/zeron-logo.png" alt="ZerOn Logo" style={{ width: '40px', height: '40px' }} />
             <div>

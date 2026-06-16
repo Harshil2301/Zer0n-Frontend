@@ -52,7 +52,8 @@ const Transaction = ({ userId: propUserId, userData }) => {
             setPlanData(snap.data())
           }
         } catch (e) {
-          console.error('Failed to load user plan data:', e)
+          // Silently ignore Firebase permission errors (dev-bypass / unauthenticated)
+          // Plan data will still load from the REST API fallback below
         }
       }
 
