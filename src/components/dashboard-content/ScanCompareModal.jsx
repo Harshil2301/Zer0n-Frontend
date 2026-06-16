@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ShieldAlert, CheckCircle, AlertTriangle, ArrowRight, Loader } from 'lucide-react'
+import { X, ShieldAlert, CheckCircle, AlertTriangle, ArrowRight, Loader, Activity } from 'lucide-react'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import './ScanCompareModal.css'
@@ -19,15 +19,19 @@ const ScanCompareModal = ({ scan1Id, scan2Id, onClose }) => {
         setLoading(true)
         
         // Fetch Scan A (older) and Scan B (newer)
-        const docA = await getDoc(doc(db, 'scans', scan1Id))
-        const docB = await getDoc(doc(db, 'scans', scan2Id))
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+        const resA = await fetch(`${apiUrl}/api/scan/${scan1Id}`)
+        const resB = await fetch(`${apiUrl}/api/scan/${scan2Id}`)
+        
+        const dataA_json = await resA.json()
+        const dataB_json = await resB.json()
 
-        if (!docA.exists() || !docB.exists()) {
+        if (!dataA_json.success || !dataB_json.success) {
           throw new Error('One or both scans could not be found.')
         }
 
-        const dataA = docA.data()
-        const dataB = docB.data()
+        const dataA = dataA_json.data
+        const dataB = dataB_json.data
 
         // Ensure Scan A is the older one
         let older = dataA
@@ -170,6 +174,17 @@ const ScanCompareModal = ({ scan1Id, scan2Id, onClose }) => {
                     <span className="compare-stat-value">{comparison.persistent.length}</span>
                     <span className="compare-stat-label">PERSISTENT</span>
                   </div>
+                </div>
+
+                {/* Diff Legend */}
+                <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                  {[
+                    { color: '#ef4444', bg: 'rgba(239,68,68,0.1)', label: '🔴 New' },
+                    { color: '#22c55e', bg: 'rgba(34,197,94,0.1)', label: '🟢 Fixed' },
+                    { color: '#eab308', bg: 'rgba(234,179,8,0.1)', label: '🟡 Persistent' },
+                  ].map(({ color, bg, label }) => (
+                    <span key={label} style={{ fontSize: '0.72rem', background: bg, border: `1px solid ${color}33`, padding: '3px 10px', borderRadius: '10px', color, fontWeight: 600 }}>{label}</span>
+                  ))}
                 </div>
 
                 {/* Diff Lists */}

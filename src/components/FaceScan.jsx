@@ -518,18 +518,6 @@ const FaceScan = () => {
     )
   }
 
-  // Calculate overall progress — reads from REFS not stale state
-  const calculateProgress = (blinksOverride, leftOverride, rightOverride) => {
-    const blinks = blinksOverride ?? blinkCountRef.current
-    const left = leftOverride ?? headVerificationRef.current.left
-    const right = rightOverride ?? headVerificationRef.current.right
-    if (right && left) return 100
-    if (left && !right) return 75
-    if (blinks >= 2) return 50
-    if (blinks === 1) return 25
-    return 0
-  }
-
   const handleVerificationComplete = async () => {
     if (isDetectingRef.current) return;
     isDetectingRef.current = true;
@@ -610,15 +598,31 @@ const FaceScan = () => {
         setLightingStatus('TOO_BRIGHT')
         throw new Error('Too much direct light. Please reduce glare or move away from a window.')
       }
-      if (variance < 350) {
+      if (variance < 200) {
         setSpoofAlert(true)
-        addTerminalLine(`> ⚠ ANTI-SPOOFING ALERT: Texture variance ${variance.toFixed(0)} < 350`)
+        addTerminalLine(`> ⚠ ANTI-SPOOFING ALERT: Texture variance ${variance.toFixed(0)} < 200`)
         throw new Error('Liveness check failed. Physical face required — photos and screens are not accepted.')
       }
       addTerminalLine('> ✓ Anti-spoofing check passed (real skin texture confirmed)')
       setLightingStatus('OK')
       setSpoofAlert(false)
-      addTerminalLine('> Querying Firebase database...')
+      addTerminalLine('> Querying verification server...')
+
+      // Probe the backend before calling the full verify endpoint
+      // This gives a clear, early error instead of a confusing "Failed to fetch" later
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
+      try {
+        const healthCheck = await fetch(`${apiUrl}/api/health`, { signal: AbortSignal.timeout(5000) })
+        if (!healthCheck.ok) throw new Error('Server unhealthy')
+        addTerminalLine('> Server connection established ✓')
+      } catch (err) {
+        console.error('Health check failed with error:', err);
+        throw new Error(
+          `Cannot reach the ZerOn backend at ${apiUrl}. ` +
+          `If you are running locally, start the backend with: cd ZerOn-Bug-Hunter-main && node server-simple.js. ` +
+          `If this is production, the Render server may be cold-starting — wait 30 seconds and retry. (Error: ${err.message})`
+        )
+      }
 
       // STEP 1: Check if face already exists in Firebase
       const existingFace = await checkExistingFaceVector(faceVector)
@@ -656,56 +660,43 @@ const FaceScan = () => {
 
         // Import utilities
         const { redirectWithUUID } = await import('../utils/uuid')
-        const { getUserProfile } = await import('../utils/faceVerification')
 
         // ✅ CLEAR OLD SESSION FIRST (Important for new scan)
         localStorage.removeItem('userId')
         localStorage.removeItem('sessionId')
         addTerminalLine('> Cleared previous session data')
 
-        // ✅ STEP 2: Check if user has complete profile data in Firebase
+        // ✅ STEP 2: Check profile via BACKEND API (bypasses Firestore security rules)
+        // The Firebase client SDK cannot read Firestore when there is no Auth session,
+        // so we always go through the backend which uses Admin SDK (no rule restrictions).
         let isComplete = false
 
         try {
-          // Check Firebase first
-          const userResult = await getUserProfile(existingFace.uuid)
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
+          addTerminalLine('> Querying user profile via secure backend...')
+          const response = await fetch(`${apiUrl}/api/user/${existingFace.uuid}/check-complete`)
+          const data = await response.json()
 
-          if (userResult.success && userResult.user) {
-            // Check if all required fields are present
-            isComplete = userResult.user.profile &&
-              userResult.user.profile.fullName &&
-              userResult.user.profile.email &&
-              userResult.user.profile.organization &&
-              (userResult.user.profile.role || userResult.user.profile.phone) // At least one more field
+          if (data.success && data.user && data.user.profile) {
+            isComplete = data.user.profile.fullName &&
+              data.user.profile.email &&
+              data.user.profile.organization &&
+              (data.user.profile.role || data.user.profile.phone)
 
             if (isComplete) {
-              addTerminalLine('> ✓ Profile complete in Firebase!')
+              addTerminalLine('> ✓ Profile complete — redirecting to dashboard!')
             } else {
-              addTerminalLine('> ⚠ Profile incomplete in Firebase')
+              addTerminalLine('> ⚠ Profile incomplete — redirecting to setup page...')
             }
           } else {
-            addTerminalLine('> ⚠ No user profile found in Firebase')
+            addTerminalLine('> ⚠ No existing profile found — new user setup required')
           }
-        } catch (fbError) {
-          console.log('Firebase check failed, trying API:', fbError)
-          addTerminalLine('> Firebase unavailable, checking via API...')
-
-          // Fallback to API check
-          try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-            const response = await fetch(`${apiUrl}/api/user/${existingFace.uuid}/check-complete`)
-            const data = await response.json()
-
-            isComplete = data.user &&
-              data.user.profile &&
-              data.user.profile.fullName &&
-              data.user.profile.email &&
-              data.user.profile.organization
-
-          } catch (apiError) {
-            console.log('API also not available')
-            addTerminalLine('> API also not available')
-          }
+        } catch (apiError) {
+          // If backend is unreachable, default to assuming complete so we try the dashboard
+          // (the dashboard itself will handle incomplete profiles gracefully)
+          console.log('Profile check API unavailable:', apiError)
+          addTerminalLine('> ⚠ Profile check unavailable — assuming complete')
+          isComplete = true
         }
 
         if (isComplete) {
@@ -765,7 +756,7 @@ const FaceScan = () => {
         addTerminalLine('> Storing AES-encrypted vector via secure backend API...')
 
         // ── SECURE: Route enrollment through backend (raw vectors never touch Firestore)
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
         const enrollResp = await fetch(`${apiUrl}/api/face/enroll`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -840,21 +831,30 @@ const FaceScan = () => {
 
     } catch (error) {
       console.error('Verification error:', error)
-      addTerminalLine(`> ERROR: ${error.message}`)
 
-      // Increment fail counter — after 2 failures, show email fallback (OWASP requirement)
+      // Provide a clear, user-friendly error message
+      const isNetworkError = error.message === 'Failed to fetch' || error.message.includes('NetworkError') || error.message.includes('ERR_CONNECTION_REFUSED')
+      const displayMessage = isNetworkError
+        ? 'Could not reach the verification server. Please ensure the backend is running, or use the 2FA Backup Login below.'
+        : error.message
+
+      addTerminalLine(`> ERROR: ${displayMessage}`)
+      addTerminalLine('> — Use the Backup Login button below to continue —')
+
+      // Increment fail counter — after 2 failures show email fallback prominently (OWASP requirement)
       setFailCount(prev => prev + 1)
-
-      addTerminalLine('> System will reset in 4 seconds...')
       setHasError(true)
+
+      // Show popup briefly but do NOT auto-reset the scan —
+      // the user should decide to retry or use 2FA, not have the page reset under them
       setPopupResult({
         type: 'error',
-        message: `${error.message}`
+        message: displayMessage
       })
       setShowPopup(true)
       setTimeout(() => {
         setShowPopup(false)
-        resetScan()
+        // Deliberately NOT calling resetScan() here so 2FA button stays visible
       }, 4000)
     }
   }
@@ -979,6 +979,7 @@ const FaceScan = () => {
                 </div>
                 <span className="ear-value">{currentEAR.toFixed(3)}</span>
               </div>
+
               <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 100 }}>
                 <button
                   onClick={() => {
@@ -1030,19 +1031,21 @@ const FaceScan = () => {
                   )}
                 </div>
               ))}
-
-              {/* 2FA Fallback Button - Appears if scan takes a while or fails */}
-              {terminalLines.length > 5 && !verificationComplete && !showPopup && (
-                <div className="terminal-line" style={{ marginTop: '1rem' }}>
-                  <button
-                    onClick={() => window.location.href = '/identity'}
-                    style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    <Lock size={14} /> Scan failed? Use 2FA Backup Login
-                  </button>
-                </div>
-              )}
             </div>
+
+            {/* 2FA Fallback Button — sticky below terminal, always visible during scan */}
+            {!verificationComplete && (
+              <div style={{ padding: '0.6rem 1rem', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#0a0a0a', flexShrink: 0, marginTop: 'auto' }}>
+                <button
+                  onClick={() => window.location.href = '/identity'}
+                  style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#ccc', border: '1px solid rgba(255,255,255,0.2)', padding: '7px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', width: '100%', justifyContent: 'center', transition: 'background 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                >
+                  <Lock size={14} /> Scan failed? Use 2FA Backup Login
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

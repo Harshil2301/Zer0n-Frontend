@@ -19,7 +19,11 @@ import {
   AlertTriangle,
   CheckCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  Key,
+  Copy,
+  RefreshCw,
+  Zap
 } from 'lucide-react'
 import './SettingsPage.css'
 
@@ -51,6 +55,10 @@ const SettingsPage = ({ userData, userId, onSave }) => {
     newPassword: '',
     confirmPassword: ''
   })
+  const [apiKey, setApiKey] = useState(null)
+  const [apiKeyCopied, setApiKeyCopied] = useState(false)
+  const [apiKeyLoading, setApiKeyLoading] = useState(false)
+  const [apiKeyUsage, setApiKeyUsage] = useState(null)
 
   useEffect(() => {
     if (userData) {
@@ -72,6 +80,9 @@ const SettingsPage = ({ userData, userId, onSave }) => {
           webhookUrl: userData.notifications.webhookUrl ?? ''
         })
       }
+      // Load API key
+      if (userData.apiKey) setApiKey(userData.apiKey)
+      if (userData.apiKeyUsage) setApiKeyUsage(userData.apiKeyUsage)
     }
   }, [userData])
 
@@ -161,11 +172,13 @@ const SettingsPage = ({ userData, userId, onSave }) => {
   const handleSaveNotifications = async () => {
     setIsSaving(true);
     try {
-      const { db } = await import('../config/firebase');
-      const { doc, setDoc } = await import('firebase/firestore');
-      const docRef = doc(db, 'users', userId);
-      
-      await setDoc(docRef, { notifications }, { merge: true });
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const response = await fetch(`${apiUrl}/api/user/${userId}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notifications })
+      });
+      if (!response.ok) throw new Error('Failed to save via API');
       
       setSaveMessage({ type: 'success', text: 'Notification preferences saved!' })
     } catch (error) {
@@ -177,11 +190,45 @@ const SettingsPage = ({ userData, userId, onSave }) => {
     }
   }
 
+  const generateUUID = () => {
+    return 'zeron-' + ([...Array(4)].map(() => Math.random().toString(36).slice(2, 8)).join('-'))
+  }
+
+  const handleGenerateApiKey = async (regenerate = false) => {
+    if (!regenerate && apiKey) return
+    setApiKeyLoading(true)
+    try {
+      const newKey = generateUUID()
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const response = await fetch(`${apiUrl}/api/user/${userId}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: newKey, apiKeyCreatedAt: new Date().toISOString() })
+      });
+      if (!response.ok) throw new Error('Failed to save API key');
+      setApiKey(newKey)
+      setSaveMessage({ type: 'success', text: regenerate ? 'API key regenerated!' : 'API key generated!' })
+      setTimeout(() => setSaveMessage(null), 3000)
+    } catch (e) {
+      setSaveMessage({ type: 'error', text: 'Failed to generate API key' })
+    } finally {
+      setApiKeyLoading(false)
+    }
+  }
+
+  const handleCopyApiKey = () => {
+    if (!apiKey) return
+    navigator.clipboard.writeText(apiKey)
+    setApiKeyCopied(true)
+    setTimeout(() => setApiKeyCopied(false), 2000)
+  }
+
   const sections = [
     { id: 'profile', name: 'Profile', icon: User },
     { id: 'security', name: 'Security', icon: Lock },
     { id: 'notifications', name: 'Notifications', icon: Bell },
-    { id: 'appearance', name: 'Appearance', icon: Palette }
+    { id: 'appearance', name: 'Appearance', icon: Palette },
+    { id: 'api', name: 'API', icon: Key },
   ]
 
   return (
@@ -596,6 +643,87 @@ const SettingsPage = ({ userData, userId, onSave }) => {
                 <Save size={18} />
                 {t('saveAppearance')}
               </button>
+            </motion.div>
+          )}
+          {/* API Key Section */}
+          {activeSection === 'api' && (
+            <motion.div
+              className="settings-section-dash"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+            >
+              <div className="section-header-settings-dash">
+                <Key size={24} />
+                <div>
+                  <h3>API Access</h3>
+                  <p>Manage your ZerOn API key for programmatic access</p>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '28px' }}>
+                <label style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '12px' }}>
+                  Your API Key
+                </label>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div style={{
+                    flex: 1,
+                    background: 'rgba(0,0,0,0.4)',
+                    border: '1px solid rgba(0,255,136,0.2)',
+                    borderRadius: '8px',
+                    padding: '12px 16px',
+                    fontFamily: 'monospace',
+                    fontSize: '0.85rem',
+                    color: apiKey ? '#00ff88' : '#444',
+                    letterSpacing: '1px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {apiKey || 'No API key generated yet'}
+                  </div>
+                  {apiKey && (
+                    <button
+                      className="save-btn-dash"
+                      style={{ padding: '12px 16px', flexShrink: 0 }}
+                      onClick={handleCopyApiKey}
+                    >
+                      {apiKeyCopied ? <CheckCircle size={16} /> : <Copy size={16} />}
+                      {apiKeyCopied ? 'Copied!' : 'Copy'}
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
+                  {!apiKey ? (
+                    <button className="save-btn-dash" onClick={() => handleGenerateApiKey(false)} disabled={apiKeyLoading}>
+                      <Zap size={16} />
+                      {apiKeyLoading ? 'Generating...' : 'Generate API Key'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { if (window.confirm('Regenerate your API key? Your old key will stop working immediately.')) handleGenerateApiKey(true) }}
+                      disabled={apiKeyLoading}
+                      style={{ background: 'rgba(255,45,85,0.1)', border: '1px solid rgba(255,45,85,0.3)', color: '#ff7b7b', borderRadius: '8px', padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}
+                    >
+                      <RefreshCw size={14} />
+                      {apiKeyLoading ? 'Regenerating...' : 'Regenerate Key'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '20px' }}>
+                <h4 style={{ margin: '0 0 12px', color: '#888', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>API Usage Example</h4>
+                <pre style={{ margin: 0, background: '#000', border: '1px solid #1a1a1a', borderRadius: '6px', padding: '16px', fontSize: '0.8rem', color: '#00ff88', overflow: 'auto', lineHeight: 1.6 }}>
+{`curl -X POST https://api.zeron.io/v1/scan \\
+  -H "Authorization: Bearer ${apiKey || 'YOUR_API_KEY'}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"domain": "https://example.com"}'`}
+                </pre>
+                <p style={{ margin: '12px 0 0', fontSize: '0.75rem', color: '#555' }}>
+                  ⚠️ Keep your API key secret. Never expose it in frontend code or public repositories.
+                </p>
+              </div>
             </motion.div>
           )}
         </div>

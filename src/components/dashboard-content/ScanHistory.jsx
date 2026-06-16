@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Filter, Download, ExternalLink, Clock, CheckCircle, AlertCircle, Loader, Trash2 } from 'lucide-react'
+import { Filter, Download, ExternalLink, Clock, CheckCircle, AlertCircle, Loader, Trash2, Share2, Copy, Search } from 'lucide-react'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts'
@@ -9,9 +9,23 @@ const ScanHistory = ({ userId }) => {
   const [scans, setScans] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, completed, started
+  const [searchQuery, setSearchQuery] = useState('')
   const [compareMode, setCompareMode] = useState(false)
   const [selectedScans, setSelectedScans] = useState([])
   const [showCompareModal, setShowCompareModal] = useState(false)
+  const [copiedId, setCopiedId] = useState(null)
+  
+  // Pagination state
+  const [lastVisible, setLastVisible] = useState(null)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  const handleShareReport = (scanId) => {
+    const reportUrl = `${window.location.origin}/report/${scanId}`
+    navigator.clipboard.writeText(reportUrl)
+    setCopiedId(scanId)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
 
   useEffect(() => {
     const fetchScanHistory = async () => {
@@ -20,16 +34,16 @@ const ScanHistory = ({ userId }) => {
       try {
         setLoading(true)
 
-        // Query the main 'scans' collection directly instead of relying on frontend array
-        const { collection, query, where, getDocs } = await import('firebase/firestore')
-        const scansRef = collection(db, 'scans')
-        const q = query(scansRef, where('userId', '==', userId))
-        
-        const querySnapshot = await getDocs(q)
+        // We fetch all scans for the user via API to bypass Firebase Auth rules
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+        const res = await fetch(`${apiUrl}/api/user/${userId}/scans`)
+        const data = await res.json()
+        const querySnapshot = data.success ? data.scans : []
         const enrichedScans = []
         
-        querySnapshot.forEach((doc) => {
-          const scanDetails = doc.data()
+        setHasMore(false) // Disabled server-side pagination to avoid index issues
+        
+        querySnapshot.forEach((scanDetails) => {
           enrichedScans.push({
             ...scanDetails,
             hasResults: true
@@ -49,6 +63,14 @@ const ScanHistory = ({ userId }) => {
         setLoading(false)
       }
     }
+
+    const loadMoreScans = async () => {
+      // Disabled since we load all scans upfront now
+      setHasMore(false)
+    }
+    
+    // Attach loadMore to window so it can be called from the button outside useEffect
+    window.loadMoreScans = loadMoreScans
 
     fetchScanHistory()
     
@@ -114,11 +136,12 @@ const ScanHistory = ({ userId }) => {
     // Fetch scan results from Firebase and display as JSON in new tab
     const fetchAndDisplayResults = async () => {
       try {
-        const scanDocRef = doc(db, 'scans', scanId)
-        const scanDoc = await getDoc(scanDocRef)
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+        const res = await fetch(`${apiUrl}/api/scan/${scanId}`)
+        const data = await res.json()
         
-        if (scanDoc.exists()) {
-          const scanData = scanDoc.data()
+        if (data.success && data.data) {
+          const scanData = data.data
           
           // Sanitize / escape helpers
           const escapeHtml = (str) => {
@@ -258,11 +281,12 @@ const ScanHistory = ({ userId }) => {
 
     const fetchAndPrintResults = async () => {
       try {
-        const scanDocRef = doc(db, 'scans', scanId)
-        const scanDoc = await getDoc(scanDocRef)
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+        const res = await fetch(`${apiUrl}/api/scan/${scanId}`)
+        const data = await res.json()
         
-        if (scanDoc.exists()) {
-          const scanData = scanDoc.data()
+        if (data.success && data.data) {
+          const scanData = data.data
           
           const escapeHtml = (str) => {
             try {
@@ -564,10 +588,15 @@ const ScanHistory = ({ userId }) => {
       // Update local state immediately
       setScans(prev => prev.filter(s => s.scanId !== scanId));
       
-      // Update Firebase 'scans' document to hide in frontend
-      const { updateDoc } = await import('firebase/firestore');
-      const scanRef = doc(db, 'scans', scanId);
-      await updateDoc(scanRef, { hiddenInFrontend: true });
+      // Call backend API to hide the scan securely
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${apiUrl}/api/scan/${scanId}`, {
+        method: 'DELETE'
+      })
+      
+      if (!res.ok) {
+        throw new Error('Failed to hide scan via API')
+      }
     } catch (hideErr) {
       console.error('Error hiding scan from frontend:', hideErr);
       alert('Failed to remove scan.');
@@ -583,8 +612,9 @@ const ScanHistory = ({ userId }) => {
 
 
   const filteredScans = scans.filter(scan => {
-    if (filter === 'all') return true
-    return scan.status?.toLowerCase() === filter
+    const matchesStatus = filter === 'all' || scan.status?.toLowerCase() === filter
+    const matchesSearch = !searchQuery || (scan.domain || '').toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesStatus && matchesSearch
   })
 
   return (
@@ -600,6 +630,29 @@ const ScanHistory = ({ userId }) => {
           </div>
         </div>
         <div className="header-actions-dash">
+          {/* Search Bar */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <Search size={14} style={{ position: 'absolute', left: '10px', color: '#555', pointerEvents: 'none' }} />
+            <input
+              type="text"
+              placeholder="Search domain..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{
+                background: 'rgba(0,0,0,0.4)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '8px',
+                padding: '8px 12px 8px 32px',
+                color: '#ddd',
+                fontSize: '0.82rem',
+                outline: 'none',
+                width: '200px',
+                transition: 'border-color 0.2s',
+              }}
+              onFocus={e => e.target.style.borderColor = 'rgba(0,255,136,0.4)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+            />
+          </div>
           <button 
             className={`action-btn-dash ${compareMode ? 'secondary-dash' : ''}`} 
             onClick={() => {
@@ -658,12 +711,13 @@ const ScanHistory = ({ userId }) => {
       <div className="scan-history-section">
         {loading ? (
         <div className="scans-list">
+          <style>{`@keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 0.1; } 100% { opacity: 0.3; } }`}</style>
           {[1, 2, 3].map(i => (
-            <div key={i} className="scan-card skeleton" style={{ padding: '20px', borderBottom: '1px solid #333', display: 'flex', gap: '15px' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#333', animation: 'pulse 1.5s infinite' }}></div>
+            <div key={i} className="scan-card skeleton" style={{ padding: '20px', borderBottom: '1px solid #222', display: 'flex', gap: '15px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', margin: '10px 0' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#555', animation: 'pulse 1.5s infinite ease-in-out' }}></div>
               <div style={{ flex: 1 }}>
-                <div style={{ width: '30%', height: '20px', background: '#333', borderRadius: '4px', marginBottom: '10px', animation: 'pulse 1.5s infinite' }}></div>
-                <div style={{ width: '60%', height: '14px', background: '#333', borderRadius: '4px', animation: 'pulse 1.5s infinite' }}></div>
+                <div style={{ width: '40%', height: '20px', background: '#555', borderRadius: '4px', marginBottom: '10px', animation: 'pulse 1.5s infinite ease-in-out' }}></div>
+                <div style={{ width: '70%', height: '14px', background: '#555', borderRadius: '4px', animation: 'pulse 1.5s infinite ease-in-out' }}></div>
               </div>
             </div>
           ))}
@@ -792,6 +846,16 @@ const ScanHistory = ({ userId }) => {
                         <Download size={16} />
                         Download PDF
                       </button>
+                      <button 
+                        className="view-results-btn"
+                        onClick={() => handleShareReport(scan.scanId)}
+                        style={{ background: 'transparent', border: '1px solid rgba(0, 255, 136, 0.3)', color: copiedId === scan.scanId ? '#00ff88' : 'rgba(0, 255, 136, 0.7)', transition: 'all 0.2s' }}
+                        onMouseOver={(e) => { e.currentTarget.style.color = '#00ff88'; e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.8)' }}
+                        onMouseOut={(e) => { e.currentTarget.style.color = copiedId === scan.scanId ? '#00ff88' : 'rgba(0, 255, 136, 0.7)'; e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.3)' }}
+                      >
+                        {copiedId === scan.scanId ? <CheckCircle size={16} /> : <Share2 size={16} />}
+                        {copiedId === scan.scanId ? 'Link Copied!' : 'Share Link'}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -801,6 +865,30 @@ const ScanHistory = ({ userId }) => {
                 </div>
               </div>
             ))}
+            
+            {hasMore && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
+                <button 
+                  onClick={() => window.loadMoreScans && window.loadMoreScans()}
+                  disabled={loadingMore}
+                  style={{
+                    padding: '10px 20px',
+                    background: 'transparent',
+                    border: '1px solid #00ccff',
+                    color: '#00ccff',
+                    borderRadius: '4px',
+                    cursor: loadingMore ? 'not-allowed' : 'pointer',
+                    opacity: loadingMore ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {loadingMore ? <Loader size={16} className="spinning" /> : <Clock size={16} />}
+                  {loadingMore ? 'Loading...' : 'Load More'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

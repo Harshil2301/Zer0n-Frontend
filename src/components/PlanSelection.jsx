@@ -245,10 +245,8 @@ const PlanSelection = () => {
 
         console.log('Storing data in Firebase...')
 
-        // Store plan selection and transaction hash in Firebase
-        const userRef = doc(db, 'users', userId)
-
-        await setDoc(userRef, {
+        // Prepare the plan update payload
+        const updatePayload = {
           walletAddress: userWallet,
           transactionHash: txHash,
           transactionDate: new Date().toISOString(),
@@ -262,7 +260,27 @@ const PlanSelection = () => {
             selectedAt: new Date().toISOString(),
             status: 'active'
           }
-        }, { merge: true })
+        };
+
+        try {
+          // Try writing directly to Firebase first (works for Google/Email sign-ins)
+          const userRef = doc(db, 'users', userId)
+          await setDoc(userRef, updatePayload, { merge: true })
+        } catch (fbWriteError) {
+          console.warn('Firebase direct write blocked by security rules. Falling back to secure backend API...');
+          
+          // Fallback to backend API (works for biometric sign-ins without active Firebase session)
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
+          const response = await fetch(`${apiUrl}/api/user/${userId}/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatePayload)
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to update plan via backend API');
+          }
+        }
 
         console.log('Data stored successfully!')
 

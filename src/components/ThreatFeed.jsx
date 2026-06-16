@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AlertTriangle, ShieldAlert, Activity, ExternalLink, ChevronRight, Loader } from 'lucide-react'
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore'
+import { db } from '../config/firebase'
 import './ThreatFeed.css'
 
 const ThreatFeed = () => {
@@ -9,6 +11,28 @@ const ThreatFeed = () => {
   const [error, setError] = useState(null)
   const [activeIndex, setActiveIndex] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
+  const [broadcasts, setBroadcasts] = useState([])
+
+  // Listen for admin global broadcasts
+  useEffect(() => {
+    const broadcastsRef = collection(db, 'broadcasts')
+    const q = query(broadcastsRef, orderBy('createdAt', 'desc'))
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const activeBroadcasts = []
+      snapshot.forEach(doc => {
+        const data = doc.data()
+        if (data.active) {
+          activeBroadcasts.push({ id: doc.id, ...data })
+        }
+      })
+      setBroadcasts(activeBroadcasts)
+    }, (err) => {
+      console.error('Error fetching broadcasts:', err)
+    })
+
+    return () => unsubscribe()
+  }, [])
 
   // Fetch from CIRCL CVE API (Free, no auth required, very reliable)
   useEffect(() => {
@@ -103,6 +127,42 @@ const ThreatFeed = () => {
       </div>
 
       <div className="threat-grid">
+        {/* Render Admin Broadcasts First */}
+        {broadcasts.map((broadcast) => (
+          <motion.div
+            key={broadcast.id}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="threat-card"
+            style={{ 
+              border: '1px solid rgba(255, 68, 68, 0.5)',
+              background: 'linear-gradient(45deg, rgba(255, 68, 68, 0.1), transparent)'
+            }}
+          >
+            <div className="threat-top-row">
+              <div className="threat-id-wrapper">
+                <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_red]" />
+                <span className="threat-id" style={{ color: '#ff4444', fontSize: '1.1rem', letterSpacing: '2px' }}>
+                  ADMIN BROADCAST
+                </span>
+              </div>
+              <div className={`threat-badge ${getSeverityColor(broadcast.severity)}`}>
+                {broadcast.severity}
+              </div>
+            </div>
+            
+            <h3 style={{ margin: '12px 0 8px 0', color: '#fff', fontSize: '1.2rem' }}>{broadcast.title}</h3>
+            
+            <p className="threat-summary" style={{ color: '#ccc', fontSize: '0.9rem', lineHeight: '1.5' }}>
+              {broadcast.message}
+            </p>
+            <div className="threat-date" style={{ marginTop: '12px' }}>
+              <span style={{ color: '#ff4444' }}>{broadcast.severity} ALERT</span>
+              <span>{broadcast.createdAt ? new Date(broadcast.createdAt.toDate()).toLocaleString() : 'Just now'}</span>
+            </div>
+          </motion.div>
+        ))}
+
         {threats.map((threat, index) => (
           <motion.div
             key={threat.id}

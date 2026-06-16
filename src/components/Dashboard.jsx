@@ -18,7 +18,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader,
-  Globe
+  Globe,
+  ShieldAlert,
+  Home
 } from 'lucide-react'
 import { getUUIDFromURL } from '../utils/uuid'
 import ProfileModal from './ProfileModal'
@@ -31,13 +33,15 @@ import { useLanguage } from '../contexts/LanguageContext'
 import './Dashboard.css'
 
 // Lazy loaded dashboard contents
+const Overview = lazy(() => import('./dashboard-content/Overview'))
 const NewScan = lazy(() => import('./dashboard-content/NewScan'))
 const ScanHistory = lazy(() => import('./dashboard-content/ScanHistory'))
 const Transaction = lazy(() => import('./dashboard-content/Transaction'))
+const AdminPanel = lazy(() => import('./dashboard-content/AdminPanel'))
 
 const Dashboard = () => {
   const { t } = useLanguage()
-  const [activeTab, setActiveTab] = useState('scan')
+  const [activeTab, setActiveTab] = useState('overview')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [selectedPlan, setSelectedPlan] = useState('basic')
   const [userData, setUserData] = useState(null)
@@ -107,7 +111,8 @@ const Dashboard = () => {
             selectedAt: loginTime,
             status: 'active'
           },
-          walletAddress: '0x28F6CAbd2d5B3b125F98ce8A3410676B23485A0b'
+          walletAddress: '0x28F6CAbd2d5B3b125F98ce8A3410676B23485A0b',
+          isAdmin: true
         })
         setSelectedPlan('premium')
         setHasPlan(true)
@@ -234,41 +239,27 @@ const Dashboard = () => {
     loadUserData()
   }, [userId, navigate])
 
-  // Validate session on mount - Disabled for now (API not implemented)
-  // useEffect(() => {
-  //   const validateSession = async () => {
-  //     const sessionId = localStorage.getItem('sessionId')
-  //     const storedUserId = localStorage.getItem('userId')
-  //     
-  //     if (!sessionId || !storedUserId || storedUserId !== userId) {
-  //       console.log('Invalid or missing session')
-  //       // Redirect to face scan if session invalid
-  //       navigate('/face-scan')
-  //       return
-  //     }
-  //
-  //     try {
-  //       const response = await fetch(`/api/session/validate`, {
-  //         method: 'POST',
-  //         headers: { 'Content-Type': 'application/json' },
-  //         body: JSON.stringify({ sessionId, userId })
-  //       })
-  //       
-  //       const data = await response.json()
-  //       
-  //       if (!data.success || !data.valid) {
-  //         console.log('Session validation failed')
-  //         localStorage.removeItem('sessionId')
-  //         localStorage.removeItem('userId')
-  //         navigate('/face-scan')
-  //       }
-  //     } catch (error) {
-  //       console.error('Session validation error:', error)
-  //     }
-  //   }
-  //
-  //   validateSession()
-  // }, [userId, navigate])
+  // Session validation — check biometric JWT token on mount
+  useEffect(() => {
+    const validateSession = () => {
+      const bioToken = localStorage.getItem('bioToken') || localStorage.getItem('zeron_bio_token');
+      
+      // If no bio token at all, redirect unless it's dev-bypass mode
+      if (!bioToken && userId !== 'dev-bypass') {
+        const sessionId = localStorage.getItem('sessionId');
+        const storedUserId = localStorage.getItem('userId');
+        
+        // Allow if we have a matching sessionId (email/Google login path)
+        if (!sessionId || !storedUserId) {
+          console.warn('[Session] No valid session token found');
+          // Don't redirect immediately — let the data load check handle it
+          // This avoids breaking email/Google login users who don't have a bioToken
+        }
+      }
+    };
+    
+    validateSession();
+  }, [userId, navigate]);
 
   return (
     <div className="dashboard-wrapper">
@@ -328,6 +319,17 @@ const Dashboard = () => {
 
                 <nav className="sidebar-nav">
                   <button
+                    className={`nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('overview')}
+                    data-tooltip="Overview"
+                  >
+                    <div className="nav-icon">
+                      <Home size={20} />
+                    </div>
+                    {sidebarOpen && <span>Overview</span>}
+                  </button>
+
+                  <button
                     className={`nav-item ${activeTab === 'scan' ? 'active' : ''}`}
                     onClick={() => setActiveTab('scan')}
                     data-tooltip="Security Scan"
@@ -371,6 +373,19 @@ const Dashboard = () => {
                     {sidebarOpen && <span>Threat Intel</span>}
                   </button>
 
+                  {userData?.isAdmin && (
+                    <button
+                      className={`nav-item ${activeTab === 'admin' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('admin')}
+                      data-tooltip="Admin Panel"
+                    >
+                      <div className="nav-icon">
+                        <ShieldAlert size={20} />
+                      </div>
+                      {sidebarOpen && <span>Admin Panel</span>}
+                    </button>
+                  )}
+
                   <div className="nav-divider"></div>
 
                   <button
@@ -387,8 +402,13 @@ const Dashboard = () => {
 
                 <div className="sidebar-footer">
                   <div className="user-profile-card">
-                    <div className="profile-avatar-small">
-                      <User size={18} />
+                    <div className="profile-avatar-small" style={{ overflow: 'hidden', padding: 0, background: 'linear-gradient(135deg, #1a1a2e, #0f3460)' }}>
+                      <img
+                        src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userData?.profile?.fullName || userData?.fullName || 'User')}&backgroundColor=0f3460&textColor=00ff88`}
+                        alt="avatar"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                        onError={e => { e.target.style.display = 'none' }}
+                      />
                     </div>
                     {sidebarOpen && (
                       <div className="profile-details">
@@ -436,6 +456,18 @@ const Dashboard = () => {
           <div className="tabs-container">
             <ErrorBoundary>
               <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}><Loader className="spinner-icon" size={32} /></div>}>
+                {/* Overview Tab */}
+                <div style={{ display: activeTab === 'overview' ? 'block' : 'none' }}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: activeTab === 'overview' ? 1 : 0, y: activeTab === 'overview' ? 0 : 20 }}
+                    transition={{ duration: 0.3 }}
+                    className="dashboard-content-section"
+                  >
+                    <Overview userId={userId} userData={userData} onNavigate={setActiveTab} />
+                  </motion.div>
+                </div>
+
                 {/* Scan Tab */}
                 <div style={{ display: activeTab === 'scan' ? 'block' : 'none' }}>
                   <motion.div
@@ -478,6 +510,20 @@ const Dashboard = () => {
                   </motion.div>
                 </div>
 
+                {/* Admin Panel Tab */}
+                {userData?.isAdmin && (
+                  <div style={{ display: activeTab === 'admin' ? 'block' : 'none' }}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: activeTab === 'admin' ? 1 : 0, y: activeTab === 'admin' ? 0 : 20 }}
+                      transition={{ duration: 0.3 }}
+                      className="dashboard-content-section"
+                    >
+                      <AdminPanel />
+                    </motion.div>
+                  </div>
+                )}
+
                 {/* Transactions Tab */}
                 <div style={{ display: activeTab === 'transactions' ? 'block' : 'none' }}>
                   <motion.div
@@ -486,7 +532,7 @@ const Dashboard = () => {
                     transition={{ duration: 0.3 }}
                     className="dashboard-content-section"
                   >
-                    <Transaction userId={userId} />
+                    <Transaction userId={userId} userData={userData} />
                   </motion.div>
                 </div>
 

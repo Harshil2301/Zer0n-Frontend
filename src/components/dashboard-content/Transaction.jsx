@@ -12,7 +12,7 @@ import { db } from '../../config/firebase'
 const planIcons = { basic: Shield, pro: Zap, premium: Crown }
 const planColors = { basic: '#00ff88', pro: '#00d4ff', premium: '#a855f7' }
 
-const Transaction = ({ userId: propUserId }) => {
+const Transaction = ({ userId: propUserId, userData }) => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const userId = propUserId || searchParams.get('id') || localStorage.getItem('userId')
@@ -28,7 +28,9 @@ const Transaction = ({ userId: propUserId }) => {
     }
 
     const fetchData = async () => {
-      if (userId === 'dev-bypass') {
+      if (userData) {
+        setPlanData(userData)
+      } else if (userId === 'dev-bypass') {
         const loginTime = localStorage.getItem('bypassLoginTime') || new Date().toISOString()
         setPlanData({
           uid: 'dev-bypass',
@@ -42,33 +44,34 @@ const Transaction = ({ userId: propUserId }) => {
             selectedAt: loginTime
           }
         })
-        setScans([])
-        setLoading(false)
-        return
+      } else {
+        try {
+          const userRef = doc(db, 'users', userId)
+          const snap = await getDoc(userRef)
+          if (snap.exists()) {
+            setPlanData(snap.data())
+          }
+        } catch (e) {
+          console.error('Failed to load user plan data:', e)
+        }
       }
 
       try {
-        const userRef = doc(db, 'users', userId)
-        const snap = await getDoc(userRef)
-        if (snap.exists()) {
-          setPlanData(snap.data())
-        }
-
-        // Fetch recent scans with payouts
-        const scansRef = collection(db, 'scans')
-        const q = query(scansRef, where('userId', '==', userId), limit(5))
-        const scansSnap = await getDocs(q)
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+        const res = await fetch(`${apiUrl}/api/user/${userId}/scans`)
+        const data = await res.json()
+        const scansSnap = data.success ? data.scans : []
         const scansList = []
-        scansSnap.forEach(doc => {
-          const data = doc.data()
-          if (data.ipfsHash || data.payoutTxHash) {
-            scansList.push({ id: doc.id, ...data })
+        scansSnap.forEach(scanData => {
+          // Show all completed scans, not just ones with IPFS/payout
+          if (scanData.status === 'completed' || scanData.ipfsHash || scanData.payoutTxHash) {
+            scansList.push({ id: scanData.id || scanData.scanId, ...scanData })
           }
         })
         
-        // Sort manually if orderBy requires an index we might not have
+        // Sort manually
         scansList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        setScans(scansList)
+        setScans(scansList.slice(0, 10))
       } catch (e) {
         console.error('Failed to load transaction data:', e)
       } finally {
@@ -76,9 +79,16 @@ const Transaction = ({ userId: propUserId }) => {
       }
     }
     fetchData()
-  }, [userId])
+  }, [userId, userData])
 
-  const plan = planData?.plan
+  const plan = planData?.plan || planData?.account?.plan || 
+    (planData?.walletAddress ? {
+      type: planData.planType || 'pro',
+      name: planData.planName || (planData.planType ? planData.planType.charAt(0).toUpperCase() + planData.planType.slice(1) : 'Pro'),
+      domains: planData.planDomains || 3,
+      status: 'active',
+      selectedAt: planData.planSelectedAt || planData.updatedAt
+    } : null)
   const PlanIcon = plan ? (planIcons[plan.type] || Shield) : Shield
   const planColor = plan ? (planColors[plan.type] || '#00ff88') : '#00ff88'
 
@@ -345,7 +355,7 @@ const Transaction = ({ userId: propUserId }) => {
             )}
           </motion.div>
 
-          {/* Bounty Escrow Transactions */}
+          {/* Scan History / Bounty Records */}
           {scans.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -361,53 +371,82 @@ const Transaction = ({ userId: propUserId }) => {
             >
               <div style={{
                 padding: '1rem 1.25rem',
-                background: 'rgba(168,85,247,0.05)',
+                background: 'rgba(0,255,136,0.04)',
                 borderBottom: '1px solid rgba(255,255,255,0.06)',
                 display: 'flex', alignItems: 'center', gap: '0.5rem'
               }}>
-                <Shield size={16} style={{ color: '#a855f7' }} />
-                <h4 style={{ margin: 0, color: '#fff', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.85rem' }}>Bounty Escrow Payouts</h4>
+                <Shield size={16} style={{ color: '#00ff88' }} />
+                <h4 style={{ margin: 0, color: '#fff', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.85rem' }}>
+                  Scan History & Bounty Records
+                </h4>
+                <span style={{ marginLeft: 'auto', color: '#555', fontSize: '0.7rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                  {scans.length} scan{scans.length !== 1 ? 's' : ''}
+                </span>
               </div>
 
-              {scans.map((scan) => (
-                <div key={scan.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '1rem 1.25rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ color: '#fff', fontSize: '0.8rem', fontFamily: 'JetBrains Mono, monospace' }}>Target: {scan.domain}</span>
-                    <span style={{ color: '#888', fontSize: '0.75rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatDate(scan.createdAt)}</span>
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.02)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <CheckCircle size={12} style={{ color: '#00ff88' }} />
-                      <span style={{ color: '#00ff88', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.65rem' }}>
-                        SMART CONTRACT PAYOUT EXECUTED
-                      </span>
+              {scans.map((scan) => {
+                const vulnCount = scan.vulnerabilities?.length || scan.totalVulnerabilities || 0
+                const bounty = scan.estimatedBounty?.total || scan.bountyValue || 0
+                return (
+                  <div key={scan.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '1rem 1.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div>
+                        <span style={{ color: '#fff', fontSize: '0.8rem', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>
+                          {scan.domain || 'Unknown Target'}
+                        </span>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '4px', flexWrap: 'wrap' }}>
+                          {vulnCount > 0 && (
+                            <span style={{ background: 'rgba(255,107,53,0.1)', border: '1px solid rgba(255,107,53,0.3)', borderRadius: '10px', padding: '1px 8px', color: '#ff6b35', fontSize: '0.65rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                              {vulnCount} vulns
+                            </span>
+                          )}
+                          {bounty > 0 && (
+                            <span style={{ background: 'rgba(0,255,136,0.08)', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '10px', padding: '1px 8px', color: '#00ff88', fontSize: '0.65rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                              ~${bounty.toLocaleString()} est.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span style={{ color: '#888', fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatDate(scan.createdAt)}</span>
                     </div>
-                    {scan.payoutTxHash && (
-                      <a 
-                        href={`https://testnet.snowtrace.io/tx/${scan.payoutTxHash}`} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#00d4ff', textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.65rem' }}
-                      >
-                        Tx Hash: {truncate(scan.payoutTxHash, 50)} <ExternalLink size={10} />
-                      </a>
-                    )}
-                    {scan.ipfsHash && (
-                      <a 
-                        href={`https://gateway.pinata.cloud/ipfs/${scan.ipfsHash}`} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#a855f7', textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.65rem' }}
-                      >
-                        IPFS Proof: ipfs://{truncate(scan.ipfsHash, 40)} <ExternalLink size={10} />
-                      </a>
-                    )}
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <CheckCircle size={12} style={{ color: '#00ff88' }} />
+                        <span style={{ color: '#00ff88', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.65rem' }}>
+                          {scan.ipfsHash || scan.payoutTxHash ? 'SMART CONTRACT PAYOUT EXECUTED' : 'SCAN COMPLETED'}
+                        </span>
+                        <code style={{ color: '#444', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.6rem', marginLeft: 'auto' }}>
+                          {truncate(scan.id || scan.scanId, 18)}
+                        </code>
+                      </div>
+                      {scan.payoutTxHash && (
+                        <a 
+                          href={`https://testnet.snowtrace.io/tx/${scan.payoutTxHash}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#00d4ff', textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.65rem' }}
+                        >
+                          Tx Hash: {truncate(scan.payoutTxHash, 50)} <ExternalLink size={10} />
+                        </a>
+                      )}
+                      {scan.ipfsHash && (
+                        <a 
+                          href={`https://gateway.pinata.cloud/ipfs/${scan.ipfsHash}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#a855f7', textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.65rem' }}
+                        >
+                          IPFS Proof: ipfs://{truncate(scan.ipfsHash, 40)} <ExternalLink size={10} />
+                        </a>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </motion.div>
           )}
+
         </>
       )}
     </div>

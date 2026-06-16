@@ -4,7 +4,6 @@ import { doc, getDoc, setDoc, updateDoc, arrayUnion, collection } from 'firebase
 import { db } from '../../config/firebase'
 import io from 'socket.io-client'
 import { useLanguage } from '../../contexts/LanguageContext'
-import { jsPDF } from 'jspdf'
 
 const NewScan = ({ userId, onNavigate }) => {
   const { t } = useLanguage()
@@ -34,7 +33,12 @@ const NewScan = ({ userId, onNavigate }) => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [terminalLogs])
 
-  // WebSocket connection
+  // On mount: clear any stale activeScanRunning flag from a disconnected/interrupted previous session
+  useEffect(() => {
+    sessionStorage.removeItem('activeScanRunning')
+  }, [])
+
+  // WebSocket connection — runs whenever activeScanId changes
   useEffect(() => {
     if (!activeScanId) return
 
@@ -55,6 +59,7 @@ const NewScan = ({ userId, onNavigate }) => {
       // If progress hits 100% via the progress event, also mark as complete
       if (data.progress >= 100) {
         setScanCompleted(true)
+        sessionStorage.removeItem('activeScanRunning')
         setScanSummary({ totalVulnerabilities: data.findings })
       }
     })
@@ -63,6 +68,7 @@ const NewScan = ({ userId, onNavigate }) => {
     newSocket.on(`scan_complete_${activeScanId}`, (data) => {
       setScanCompleted(true)
       setScanProgress(100)
+      sessionStorage.removeItem('activeScanRunning')
       setScanSummary(data)
       setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ✅ Scan complete! Found ${data.totalVulnerabilities} vulnerabilities.`])
     })
@@ -89,26 +95,43 @@ const NewScan = ({ userId, onNavigate }) => {
       }
 
       try {
-        // Fetch user plan data
-        const userRef = doc(db, 'users', userId)
-        const userSnap = await getDoc(userRef)
-        
-        if (userSnap.exists()) {
-          const userData = userSnap.data()
-          setUserPlan(userData.plan)
-          console.log('User plan loaded:', userData.plan)
+        // Try Firebase first (works for Google/Email auth)
+        let dataLoaded = false;
+        try {
+          const userRef = doc(db, 'users', userId)
+          const userSnap = await getDoc(userRef)
+          if (userSnap.exists()) {
+            const userData = userSnap.data()
+            setUserPlan(userData.plan)
+            console.log('User plan loaded from Firebase:', userData.plan)
+            dataLoaded = true;
+          }
+        } catch (fbError) {
+          console.log('Firebase plan load failed, falling back to API...');
         }
 
-        // Fetch scan results from scanreturn collection
-        const scanRef = doc(db, 'scanreturn', userId)
-        const scanSnap = await getDoc(scanRef)
-        
-        if (scanSnap.exists()) {
-          const scanData = scanSnap.data()
-          setScans(scanData.scanResults || [])
-          console.log('Scan results loaded:', scanData.scanResults)
-        } else {
-          setScans([])
+        // Fallback to API (works for Biometric auth)
+        if (!dataLoaded) {
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+          const response = await fetch(`${apiUrl}/api/user/${userId}`)
+          if (response.ok) {
+            const data = await response.json()
+            if (data.success && data.user) {
+              setUserPlan(data.user.plan || data.user.account?.plan)
+              console.log('User plan loaded from API:', data.user.plan)
+            }
+          }
+        }
+
+        // Try to fetch scan history (we skip this for biometric since ScanHistory handles it)
+        try {
+          const scanRef = doc(db, 'scanreturn', userId)
+          const scanSnap = await getDoc(scanRef)
+          if (scanSnap.exists()) {
+            setScans(scanSnap.data().scanResults || [])
+          }
+        } catch (e) {
+          console.log('Skipping scanreturn load (will use local state only)');
         }
       } catch (error) {
         console.error('Error fetching user data:', error)
@@ -142,8 +165,14 @@ const NewScan = ({ userId, onNavigate }) => {
       return
     }
 
+    if (sessionStorage.getItem('activeScanRunning') === 'true') {
+      setError('A scan is already in progress. Please wait for it to complete.')
+      return
+    }
+
     setLoading(true)
     setError('')
+    sessionStorage.setItem('activeScanRunning', 'true')
 
     try {
       // Call your API to start the scan
@@ -164,7 +193,7 @@ const NewScan = ({ userId, onNavigate }) => {
       })
 
       if (!response.ok) {
-
+        sessionStorage.removeItem('activeScanRunning')
         throw new Error('Failed to start scan')
       }
 
@@ -182,41 +211,36 @@ const NewScan = ({ userId, onNavigate }) => {
         estimatedDuration: scanResult.estimatedDuration
       }
 
-      // Store scan results in scanreturn collection (separate document per user)
-        const scanRef = doc(db, 'scanreturn', userId)
-        const scanSnap = await getDoc(scanRef)
-
-        if (scanSnap.exists()) {
-          // Update existing scan document
-          await updateDoc(scanRef, {
-            scanResults: arrayUnion(scanRecord)
-          })
-        } else {
-          // Create new scan document
-          await setDoc(scanRef, {
-            userId: userId,
-            scanResults: [scanRecord]
-          })
-        }
-
-        // Update domain usage count in user document
-        const userRef = doc(db, 'users', userId)
-        const userSnap = await getDoc(userRef)
-        const userData = userSnap.data()
-        
-        await updateDoc(userRef, {
-          'plan.domainsUsed': (userData.plan?.domainsUsed || 0) + 1
+      // Record scan and update domains securely via backend
+      try {
+        const recordResponse = await fetch(`${apiUrl}/api/user/${userId}/record-scan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scanRecord })
         })
+        if (!recordResponse.ok) {
+          console.warn('Failed to record scan via API, tracking locally only');
+        }
+      } catch (recordError) {
+        console.warn('Failed to record scan via API, tracking locally only', recordError);
+      }
 
       // Update local state
       setScans([...scans, scanRecord])
       setActiveScanId(scanResult.scanId)
+      
+      // Update domain count in local state and clear session cache so dashboard fetches fresh data
+      if (userPlan) {
+        setUserPlan(prev => ({ ...prev, domainsUsed: (prev.domainsUsed || 0) + 1 }))
+        sessionStorage.removeItem('zeron_profile_cache')
+      }
       setTerminalLogs([`[${new Date().toLocaleTimeString()}] Scan initiated for ${domain.toLowerCase()}`])
       setScanProgress(0)
       setScanPhase('Initializing')
       
     } catch (error) {
       console.error('Error initiating scan:', error)
+      sessionStorage.removeItem('activeScanRunning')
       setError('Failed to initiate scan. Please check your connection and try again.')
     } finally {
       setLoading(false)
@@ -256,113 +280,25 @@ const NewScan = ({ userId, onNavigate }) => {
     }
   }
 
-  // --- PDF GENERATION LOGIC (MATCHED TO SCAN HISTORY) ---
+  // --- PDF GENERATION LOGIC ---
   const handleDownloadReport = async (scanId) => {
-    const newWindow = window.open('', '_blank')
-    if (newWindow) {
-      newWindow.document.write(`<html><body style="background:#000;color:#00ff88;display:flex;align-items:center;justify-content:center;height:100vh;font-family:monospace;">GENERATING SECURE REPORT...</body></html>`)
-    }
-
     try {
-      const scanDocRef = doc(db, 'scans', scanId)
-      const scanDoc = await getDoc(scanDocRef)
-      if (scanDoc.exists()) {
-        const scanData = scanDoc.data()
-        const vulnCandidates = scanData.vulnerabilities || scanData.vulns || []
-        const vulnerabilities = Array.isArray(vulnCandidates) ? vulnCandidates : []
-        
-        // Use the same professional layout as ScanHistory but even more premium
-        newWindow.document.open()
-        newWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>ZerOn Security Audit - ${scanId}</title>
-              <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                body { background: #08080c !important; color: #d1d4dc; font-family: 'Segoe UI', sans-serif; padding: 40px; margin: 0; }
-                .container { max-width: 900px; margin: 0 auto; }
-                
-                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #00ff88; padding-bottom: 20px; margin-bottom: 40px; }
-                .brand { font-size: 28px; font-weight: 850; color: #00ff88; letter-spacing: 2px; }
-                .brand span { color: #00d4ff; }
-                .confidential { background: rgba(255, 45, 85, 0.1); color: #ff2d55; border: 1px solid #ff2d55; padding: 5px 15px; border-radius: 4px; font-size: 12px; font-weight: bold; letter-spacing: 1px; }
-                
-                .summary-card { background: #111218; border: 1px solid #222530; border-radius: 12px; padding: 30px; margin-bottom: 40px; }
-                .summary-title { color: #00d4ff; font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 20px; border-bottom: 1px solid #222530; padding-bottom: 10px; }
-                .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-                .summary-item { font-size: 13px; }
-                .summary-item strong { color: #8a8d9a; display: inline-block; width: 150px; font-size: 11px; text-transform: uppercase; }
-                
-                .vuln-card { background: #111218; border: 1px solid #222530; border-left: 6px solid #ff2d55; border-radius: 10px; padding: 25px; margin-bottom: 30px; break-inside: avoid; }
-                .vuln-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #222530; padding-bottom: 12px; }
-                .vuln-title { font-size: 18px; color: #fff; font-weight: 700; }
-                .severity-tag { padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-                
-                pre { background: #08080c; border: 1px solid #1f222e; padding: 15px; border-radius: 6px; color: #00d4ff; font-family: 'Consolas', monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow: auto; margin-top: 10px; }
-                .section-label { color: #8a8d9a; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 15px; display: block; }
-                
-                .footer { text-align: center; border-top: 1px solid #222530; padding-top: 20px; margin-top: 60px; font-size: 11px; color: #555; font-family: monospace; letter-spacing: 1px; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <div class="header">
-                  <div class="brand">ZER<span>ON</span> SECURITY AUDIT</div>
-                  <div class="confidential">TOP SECRET • INTERNAL USE ONLY</div>
-                </div>
-                
-                <div class="summary-card">
-                  <div class="summary-title">Executive VAPT Summary</div>
-                  <div class="summary-grid">
-                    <div class="summary-item"><strong>Target Domain:</strong> ${scanData.domain}</div>
-                    <div class="summary-item"><strong>Assessment Date:</strong> ${new Date(scanData.createdAt).toLocaleDateString()}</div>
-                    <div class="summary-item"><strong>Scan Status:</strong> COMPLETED</div>
-                    <div class="summary-item"><strong>Identified Risks:</strong> ${vulnerabilities.length} Points of Exposure</div>
-                  </div>
-                </div>
-
-                <h2 style="font-size: 20px; color: #00d4ff; margin-bottom: 25px; letter-spacing: 1px;">VULNERABILITY ASSESSMENT FINDINGS</h2>
-                
-                ${vulnerabilities.map(v => {
-                  const isHigh = v.severity?.toLowerCase() === 'critical' || v.severity?.toLowerCase() === 'high';
-                  return `
-                    <div class="vuln-card" style="border-left-color: ${isHigh ? '#ff2d55' : '#ffd60a'}">
-                      <div class="vuln-header">
-                        <div class="vuln-title">${v.type || 'Security Violation'}</div>
-                        <div class="severity-tag" style="background: ${isHigh ? 'rgba(255,45,85,0.1)' : 'rgba(255,214,10,0.1)'}; color: ${isHigh ? '#ff2d55' : '#ffd60a'}">
-                          ${v.severity || 'UNKNOWN'}
-                        </div>
-                      </div>
-                      <div style="font-size: 13px; margin-bottom: 5px;"><strong>Endpoint:</strong> <code>${v.endpoint || scanData.domain}</code></div>
-                      <div style="font-size: 13px;"><strong>Parameter:</strong> <code>${v.parameter || 'N/A'}</code></div>
-                      
-                      <span class="section-label">Technical Proof of Concept (PoC)</span>
-                      <pre>${v.proof || v.description || 'Verified via automated security engine.'}</pre>
-                      
-                      <span class="section-label">Remediation Suggestion</span>
-                      <div style="margin-top: 8px; font-size: 13px; line-height: 1.4;">
-                        ${v.type?.includes('SQL') ? 'Implement parameterized queries and use Web Application Firewalls (WAF) to filter malicious patterns.' : 
-                          v.type?.includes('XSS') ? 'Enforce strict Content Security Policy (CSP) headers and escape all dynamic content output.' : 
-                          'Audit your security headers and ensure the application follows OWASP Top 10 best practices.'}
-                      </div>
-                    </div>
-                  `
-                }).join('')}
-                
-                <div class="footer">
-                  [ PRODUCED BY ZERON AUTONOMOUS AGENT • CERTIFICATE ID: ${scanId.substring(0,8)} ]
-                </div>
-              </div>
-              <script>window.onload = () => { setTimeout(() => window.print(), 800); }</script>
-            </body>
-          </html>
-        `)
-        newWindow.document.close()
-      }
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const response = await fetch(`${apiUrl}/api/report/pdf/${scanId}`);
+      if (!response.ok) throw new Error('Failed to download PDF');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ZerOn_Report_${scanId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (err) {
-      newWindow.close()
-      alert('Report generation failed.')
+      console.error('Error downloading report:', err);
+      alert('Report generation failed. Please try again later.');
     }
   }
 
@@ -465,6 +401,30 @@ const NewScan = ({ userId, onNavigate }) => {
           <div className="scan-error">
             <AlertCircle size={14} />
             <span>{error}</span>
+            {error.includes('already in progress') && (
+              <button
+                onClick={() => {
+                  sessionStorage.removeItem('activeScanRunning')
+                  setError('')
+                  setActiveScanId(null)
+                  setScanCompleted(false)
+                  setScanProgress(0)
+                }}
+                style={{
+                  marginLeft: '12px',
+                  background: 'transparent',
+                  border: '1px solid rgba(255,100,100,0.4)',
+                  borderRadius: '6px',
+                  color: '#ff8888',
+                  padding: '2px 10px',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                  flexShrink: 0
+                }}
+              >
+                Force New Scan
+              </button>
+            )}
           </div>
         )}
 

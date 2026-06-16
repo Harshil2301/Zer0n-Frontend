@@ -368,8 +368,9 @@
   font-size: 0.8rem;
   line-height: 1.5;
   color: #00ff00;
-  overflow: hidden;
+  overflow-y: auto;      /* logs scroll, button stays visible */
   min-height: 0;
+  max-height: 340px;     /* cap height so sticky button is always in view */
 }
 
 .terminal-split {

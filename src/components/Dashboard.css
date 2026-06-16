@@ -1243,3 +1243,40 @@
     justify-content: center;
   }
 }
+
+/* Mobile: Fix section header and actions row */
+@media (max-width: 640px) {
+  .section-header-dash {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 0 0.5rem 1.5rem;
+    padding: 1rem;
+  }
+
+  .header-actions-dash {
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .action-btn-dash {
+    flex: 1;
+    justify-content: center;
+    min-width: 100px;
+  }
+
+  .filter-select {
+    flex: 1;
+  }
+
+  .dashboard-main,
+  .dashboard-main.sidebar-open,
+  .dashboard-main.sidebar-closed {
+    padding: 1rem 0.75rem;
+  }
+
+  .scan-history-list {
+    max-width: 100%;
+  }
+}

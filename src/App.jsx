@@ -23,6 +23,7 @@ const Whitepaper     = lazy(() => import('./components/Whitepaper'))
 const Contact        = lazy(() => import('./components/Contact'))
 const Documentation  = lazy(() => import('./components/Documentation'))
 const DownloadCenter = lazy(() => import('./components/DownloadCenter'))
+const PublicReport   = lazy(() => import('./components/PublicReport'))
 
 // Minimal loading fallback shown while lazy chunks download
 const PageLoader = () => (
@@ -94,6 +95,7 @@ function App() {
               <Route path="/contact" element={<Contact />} />
               <Route path="/documentation" element={<Documentation />} />
               <Route path="/download" element={<DownloadCenter />} />
+              <Route path="/report/:scanId" element={<PublicReport />} />
             </Routes>
           </Suspense>
         </ErrorBoundary>

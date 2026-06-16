@@ -90,7 +90,7 @@ const Identity = () => {
         
         // Fallback to API if Firebase fails
         try {
-          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
           const response = await fetch(`${apiUrl}/api/user/${userId}`)
           const data = await response.json()
           
@@ -279,13 +279,51 @@ const Identity = () => {
     const result = await signInWithGoogle()
     
     if (result.success) {
-      // Check if profile exists and is complete
-      const profileResult = await getUserProfile(result.user.uid);
-      let isComplete = false;
-      if (profileResult.success && profileResult.exists) {
-         const profileData = profileResult.data;
-         const p = profileData.profile || profileData;
-         isComplete = p.fullName && p.email && p.organization && p.phone;
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
+
+      // ── Step 1: Check if this Google email already belongs to a face-enrolled account ──
+      // This prevents creating a duplicate account when the user signed up via face scan.
+      let existingUUID = userId || null; // Use URL UUID if present
+
+      if (!existingUUID && result.user.email) {
+        try {
+          // Ask the backend if any user document has this email
+          const emailCheckRes = await fetch(`${apiUrl}/api/user/by-email?email=${encodeURIComponent(result.user.email)}`)
+          if (emailCheckRes.ok) {
+            const emailCheckData = await emailCheckRes.json()
+            if (emailCheckData.success && emailCheckData.userId) {
+              existingUUID = emailCheckData.userId
+              console.log('[Google Login] Found existing face account by email:', existingUUID)
+            }
+          }
+        } catch (e) {
+          console.warn('[Google Login] Email lookup failed, will use Firebase UID:', e.message)
+        }
+      }
+
+      // ── Step 2: Determine which account ID to use ──
+      // Priority: existing face UUID > Firebase Google UID
+      const accountId = existingUUID || result.user.uid
+
+      // ── Step 3: Check if that account's profile is already complete ──
+      let isComplete = false
+      try {
+        const profileRes = await fetch(`${apiUrl}/api/user/${accountId}`)
+        if (profileRes.ok) {
+          const profileData = await profileRes.json()
+          if (profileData.success && profileData.user) {
+            const p = profileData.user?.profile || profileData.user
+            isComplete = !!(p.fullName && p.email && p.organization && p.phone)
+          }
+        }
+      } catch (e) {
+        // Fallback to Firestore client-side check
+        const { getUserProfile } = await import('../utils/firestore')
+        const profileResult = await getUserProfile(accountId)
+        if (profileResult.success && profileResult.exists) {
+          const p = profileResult.data?.profile || profileResult.data
+          isComplete = !!(p.fullName && p.email && p.organization && p.phone)
+        }
       }
 
       setFormData(prev => ({
@@ -298,12 +336,10 @@ const Identity = () => {
       if (isComplete) {
         setSuccessMessage('Welcome back! Redirecting to dashboard...')
         setTimeout(() => {
-          navigate(`/dashboard?id=${result.user.uid}`)
+          navigate(`/dashboard?id=${accountId}`)
         }, 1000)
       } else {
         setSuccessMessage('Successfully signed in with Google!')
-        
-        // Wait a bit to show success message, then move to next step
         setTimeout(() => {
           setStep(2)
           setIsProcessing(false)
@@ -315,6 +351,7 @@ const Identity = () => {
       setLoginMethod(null)
     }
   }
+
 
   const handleManualLogin = () => {
     setLoginMethod('manual')
@@ -414,7 +451,7 @@ const Identity = () => {
     setErrorMessage('')
     
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
       
       // In a real app, this would check the backend to confirm the user's email 
       // is actually verified in the Firebase Admin SDK, preventing client-side spoofing.
@@ -512,8 +549,9 @@ const Identity = () => {
         }
         
         // Also try to save via API (as backup)
+        let apiSaved = false
         try {
-          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
           const response = await fetch(`${apiUrl}/api/user/${userId}/complete-profile`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -524,13 +562,14 @@ const Identity = () => {
           
           if (data.success) {
             console.log('Profile saved via API')
+            apiSaved = true
           }
         } catch (apiError) {
           console.log('API save failed:', apiError)
         }
         
         // Show success if either Firebase or API succeeded
-        if (firebaseSaved) {
+        if (firebaseSaved || apiSaved) {
           setSuccessMessage('Profile saved successfully!')
           
           // Redirect to dashboard with UUID after short delay

@@ -53,9 +53,32 @@ export const signInWithGoogle = async () => {
     };
   } catch (error) {
     console.error('Google sign-in error:', error);
+
+    let errorMessage = 'Failed to sign in with Google. Please try again.';
+
+    switch (error.code) {
+      case 'auth/internal-error':
+        errorMessage = 'Google Sign-In encountered an internal error. This is often caused by a browser security policy (CSP) blocking Google scripts. Please try again or use a different browser.';
+        break;
+      case 'auth/popup-closed-by-user':
+        errorMessage = 'Sign-in popup was closed. Please try again.';
+        break;
+      case 'auth/popup-blocked':
+        errorMessage = 'Sign-in popup was blocked by your browser. Please allow popups for this site.';
+        break;
+      case 'auth/unauthorized-domain':
+        errorMessage = 'This domain is not authorized for Google Sign-In. Add it in Firebase Console → Authentication → Settings → Authorized domains.';
+        break;
+      case 'auth/cancelled-popup-request':
+        errorMessage = 'Only one sign-in popup can be open at a time.';
+        break;
+      default:
+        errorMessage = error.message;
+    }
+
     return {
       success: false,
-      error: error.message,
+      error: errorMessage,
       errorCode: error.code
     };
   }

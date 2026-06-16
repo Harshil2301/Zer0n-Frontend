@@ -62,8 +62,16 @@ const ProfileModal = ({ isOpen, onClose, userData, userId }) => {
             className="profile-modal-dash"
           >
             <div className="profile-header-dash">
-              <div className="profile-avatar-dash">
-                {getInitials(userData?.profile?.fullName || userData?.fullName)}
+              <div className="profile-avatar-dash" style={{ overflow: 'hidden', padding: 0, background: 'linear-gradient(135deg, #1a1a2e, #0f3460)' }}>
+                <img
+                  src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userData?.profile?.fullName || userData?.fullName || 'User')}&backgroundColor=0f3460&textColor=00ff88`}
+                  alt="avatar"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                  onError={e => {
+                    e.target.style.display = 'none'
+                    e.target.parentElement.textContent = getInitials(userData?.profile?.fullName || userData?.fullName)
+                  }}
+                />
               </div>
               <div className="profile-info-dash">
                 <h3>{userData?.profile?.fullName || userData?.fullName || 'User'}</h3>
